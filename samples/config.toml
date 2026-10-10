@@ -1,0 +1,42 @@
+# Sample config for memory-agent.
+#
+# Copy this to ``<vault>/config.toml`` and edit the roots you want
+# to scan. The default timezone is Asia/Shanghai because v1 ships
+# for the local operator; switch to ``UTC`` if you travel a lot.
+
+# Default timezone for naive timestamps during backfill.
+timezone = "Asia/Shanghai"
+
+# Source roots to scan. Each root has a ``<connector>=<path>`` shape
+# so the same config can carry Claude Code + Codex sessions.
+#
+# The first ``init --root`` call pins every file under these roots
+# at end-of-file; later ``memory scan`` runs only consume appended
+# content. If you want to backfill an existing history, run the
+# explicit ``memory scan --mode backfill --since … --until …``.
+#
+# Note: this section is **optional** — ``init`` can take the same
+# ``--root`` arguments on its command line.
+#
+# [roots]
+# claude-code = "/Users/you/.claude/projects"
+# codex = "/Users/you/.codex/sessions"
+
+# Worker schedule. The long-running ``memory worker`` reads this
+# file on every pass; see docs/16 for the full schema.
+#
+# [worker]
+# every_seconds = 60
+# daily_at_hour = 2
+
+# Telegram decision channel. The bot token is read from the
+# environment variable named by ``token_env``; no secrets live in
+# this file.
+#
+# [telegram]
+# enabled = true
+# token_env = "MEMORY_AGENT_TELEGRAM_TOKEN"
+# base_url = "https://api.telegram.org"
+# allowed_chats = ["-1001234567890"]
+# allowed_users = ["555000111"]
+# callback_ttl_seconds = 86400
