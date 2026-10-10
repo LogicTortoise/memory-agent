@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>memory-agent audit</title>
+    <script>
+      // Runtime config injected by the Python entry point. The server
+      // stamps the actual loopback origin + session token onto the page
+      // so the React app can POST /api/v1/commands without ever seeing
+      // a CORS-allowlisted origin that isn't itself.
+      window.__MA_CONFIG__ = window.__MA_CONFIG__ || {
+        origin: window.location.origin,
+        sessionToken: null,
+      };
+    </script>
+    <script type="module" crossorigin src="./assets/index-D0eKQFrH.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DfyWkpWk.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

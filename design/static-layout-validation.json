@@ -1,0 +1,29 @@
+{
+  "renders": [
+    {
+      "file": "audit-batch-detail.svg",
+      "canvas": {
+        "width": 1440,
+        "height": 960
+      },
+      "text_outside_canvas": []
+    },
+    {
+      "file": "audit-overview-dark.svg",
+      "canvas": {
+        "width": 1440,
+        "height": 960
+      },
+      "text_outside_canvas": []
+    },
+    {
+      "file": "audit-overview-light.svg",
+      "canvas": {
+        "width": 1440,
+        "height": 960
+      },
+      "text_outside_canvas": []
+    }
+  ],
+  "review": "Three exact-size PNGs visually inspected; no functional or responsive implementation exists."
+}
