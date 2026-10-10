@@ -1,0 +1,270 @@
+{
+  "version": 1,
+  "date": "2026-10-08",
+  "files": [
+    {
+      "path": "evidence/basic-memory_README.md",
+      "bytes": 24495,
+      "sha256": "f17c69dbb796108638d4da27fc7929aef8f6cd99d2c66ec4b22b01a8ca40dc52",
+      "source_url": "https://raw.githubusercontent.com/basicmachines-co/basic-memory/main/README.md",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/cc_hooks.html",
+      "bytes": 2946590,
+      "sha256": "108b4f10f8e12008275fe995f05cfd2bb42e5d6b273460398bdb039d9fcc9fde",
+      "source_url": "https://code.claude.com/docs/en/hooks",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/cc_skills.html",
+      "bytes": 1201647,
+      "sha256": "fe8e1745feb8aa82c4c0fee989fedb78547dcb25cf4fc8c15fa2636baa3f05b7",
+      "source_url": "https://code.claude.com/docs/en/skills",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_app.html",
+      "bytes": 377036,
+      "sha256": "d9193ce650cf06b125f5f937ab100173b3d6d86e4783582702ba7d7b388b3ccc",
+      "source_url": "https://learn.chatgpt.com/docs/app",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_app_server.html",
+      "bytes": 959351,
+      "sha256": "6d91ce631f31b11255fe50afa268cf1234015f0f86f10d9c4ac9b614edcb92de",
+      "source_url": "https://learn.chatgpt.com/docs/app-server",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_build_skills.html",
+      "bytes": 404830,
+      "sha256": "bc20a37f6b2ad40fcaec16fdb66ed723c4ea9a91a38b24ea8ebedbf067cb9889",
+      "source_url": "https://learn.chatgpt.com/docs/build-skills",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_changelog.html",
+      "bytes": 800659,
+      "sha256": "d8adb8ac9af57e8833c2aac42fbe41e11eef4e1ef58f19ad02dafc4b64fa59bb",
+      "source_url": "https://learn.chatgpt.com/docs/changelog",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_cli_index.html",
+      "bytes": 397804,
+      "sha256": "24055db05f52bff50af642df03820f542c2bf501663f352f2fc75ecf49eeebab",
+      "source_url": "https://learn.chatgpt.com/docs/codex/cli",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_cli_reference.html",
+      "bytes": 1040804,
+      "sha256": "584d199734a582dbab2a2a947ff300a85d595a25a1338eb3cd6ab87b94b305dc",
+      "source_url": "https://learn.chatgpt.com/docs/developer-commands",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_config_advanced.html",
+      "bytes": 540968,
+      "sha256": "bc2fc0b223d662f15e4ef5a4e47b065fd070e7050a3f8274d523a709f298a1b9",
+      "source_url": "https://learn.chatgpt.com/docs/config-file/config-advanced",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_config_basic.html",
+      "bytes": 402891,
+      "sha256": "2c7b5a3082eec09cac6bbf018c8e31fdbd5ca50a64d831c750b64169f83af47c",
+      "source_url": "https://learn.chatgpt.com/docs/config-file/config-basic",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_config_reference.html",
+      "bytes": 1415892,
+      "sha256": "beff30b69a13e17943756980d2a81864fd6672da657353d46c554b11edd4b953",
+      "source_url": "https://learn.chatgpt.com/docs/config-file/config-reference",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_desktop.html",
+      "bytes": 469616,
+      "sha256": "0d6f95deb985174e92c6cdcf142f42aced885bee4e1952cf258ec2f087c3a013",
+      "source_url": "https://learn.chatgpt.com/docs/desktop",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_developer_commands.html",
+      "bytes": 1040804,
+      "sha256": "584d199734a582dbab2a2a947ff300a85d595a25a1338eb3cd6ab87b94b305dc",
+      "source_url": "https://learn.chatgpt.com/docs/developer-commands",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_feature_maturity.html",
+      "bytes": 336365,
+      "sha256": "dfb2980a6a3a954ab090f8f2bdb27ac49910281d3b025687e368f3a6f4ca27c9",
+      "source_url": "https://learn.chatgpt.com/docs/feature-maturity",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_features.html",
+      "bytes": 387285,
+      "sha256": "3d796102bf788295bbb8165870d9957152ae9d9fb05f90999ed890a9f20aee15",
+      "source_url": "https://learn.chatgpt.com/docs/features",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_hooks.html",
+      "bytes": 515144,
+      "sha256": "9372d2fd7ea95d488a5067e3848ddcd3fe621367f2f63fc7ec7925a313269c54",
+      "source_url": "https://learn.chatgpt.com/docs/hooks",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_hooks_config.html",
+      "bytes": 469651,
+      "sha256": "6c11083fca870c3bce1b9e477103f86c73a74b99dc0b35dde7fbb8a6af070056",
+      "source_url": "https://learn.chatgpt.com/docs/config-hooks",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_noninteractive.html",
+      "bytes": 428117,
+      "sha256": "c060c531c650cee3098beedd1e1b41cb3eaed5061ad1d3fbf40167fae2bd305e",
+      "source_url": "https://learn.chatgpt.com/docs/non-interactive-mode",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_notifications.html",
+      "bytes": 391741,
+      "sha256": "abc58123e3b2131ca5ea4b8764ff4b5786ebf2f2789899203796e3afe79f8ac6",
+      "source_url": "https://learn.chatgpt.com/docs/notifications",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_reference_commands.html",
+      "bytes": 428475,
+      "sha256": "cd01c6a25b61b1130584f580964032f655ea20b725af82dc216eeeb70def009f",
+      "source_url": "https://learn.chatgpt.com/docs/reference/commands",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_reference_settings.html",
+      "bytes": 497598,
+      "sha256": "97c2803ca07347d3f728ea0229ccb1aeaa073f4e903ef4ce7dd7977e134768b2",
+      "source_url": "https://learn.chatgpt.com/docs/reference/settings",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_skills.html",
+      "bytes": 404830,
+      "sha256": "bc20a37f6b2ad40fcaec16fdb66ed723c4ea9a91a38b24ea8ebedbf067cb9889",
+      "source_url": "https://learn.chatgpt.com/docs/build-skills",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/codex_skills_and_plugins.html",
+      "bytes": 355913,
+      "sha256": "612fc98d130f95ba78f842bf24dfb91f3a9e5a1d219eaf1e3e314b27c68674b6",
+      "source_url": "https://learn.chatgpt.com/docs/skills-and-plugins",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/graphiti_README.md",
+      "bytes": 31417,
+      "sha256": "72c09aa0f12b7835f8c2919000788bca43306cf847269d4c3a7f35c957218689",
+      "source_url": "https://raw.githubusercontent.com/getzep/graphiti/main/README.md",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/langmem_background_quickstart.html",
+      "bytes": 53890,
+      "sha256": "30490b7069f7ec6519924104bc078e3e6c8c03f2198f5322259f8b529397f233",
+      "source_url": "https://langchain-ai.github.io/langmem/background_quickstart/",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/langmem_conceptual_guide.html",
+      "bytes": 102736,
+      "sha256": "9fb1062ea629efb77107e393174961c2d3a5f0dfbd8b8842feb0ad8fd7b30f7a",
+      "source_url": "https://langchain-ai.github.io/langmem/concepts/conceptual_guide/",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/letta_sleep_time_compute.html",
+      "bytes": 41091,
+      "sha256": "42962c276b9a674bfd429e8073bccb4ce8ad796985c7a682fcd2c37f1731f00c",
+      "source_url": "https://www.letta.com/blog/sleep-time-compute/",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/longmemeval_README.md",
+      "bytes": 15970,
+      "sha256": "c4ff45676683d9e2f7cf7d9099d26426f14635ec110dbb1da818d1019a142573",
+      "source_url": "https://raw.githubusercontent.com/xiaowu0162/LongMemEval/main/README.md",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/mem0_prompts.py",
+      "bytes": 64064,
+      "sha256": "10bc8a34b3b5f0ce24560a2a3190c9112b979a891b981f48393bbd168d915a5c",
+      "source_url": "https://raw.githubusercontent.com/mem0ai/mem0/main/mem0/configs/prompts.py",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/openviking_README.md",
+      "bytes": 25863,
+      "sha256": "cef2ba1d2edbf8ca5caa75f7087f4ec1e52c4edc0229835dbf29065b406d36a1",
+      "source_url": "https://raw.githubusercontent.com/volcengine/OpenViking/main/README.md",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/pageindex_README.md",
+      "bytes": 12965,
+      "sha256": "fc08d3fad45b28810d578c1fe71859619abc06e7849daf9025982c0168a42308",
+      "source_url": "https://raw.githubusercontent.com/VectifyAI/PageIndex/main/README.md",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    },
+    {
+      "path": "evidence/qmd_README.md",
+      "bytes": 66389,
+      "sha256": "af5f41ebeea04e0928fccd38ba5f47d90749b8f0417b84a99f89a677fefae76a",
+      "source_url": "https://raw.githubusercontent.com/tobi/qmd/main/README.md",
+      "access_date": "2026-10-08",
+      "kind": "public-source-snapshot"
+    }
+  ]
+}

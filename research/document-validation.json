@@ -1,0 +1,20 @@
+{
+  "revision": "session scanning / small batches / query BM25 / SQLite / audit UI",
+  "files_checked": 18,
+  "local_links_and_images_checked": 68,
+  "json_examples_checked": 4,
+  "yaml_examples_checked": 1,
+  "svg_xml_checked": 3,
+  "text_contrast_ratios": {
+    "light_main": 13.27,
+    "light_muted": 5.14,
+    "light_accent": 6.75,
+    "light_pending": 5.56,
+    "dark_main": 11.12,
+    "dark_muted": 7.0,
+    "dark_pending": 7.03,
+    "dark_selected": 5.82
+  },
+  "issues": [],
+  "scope": "设计文档、协议示例、静态 SVG/PNG；未实现或运行产品功能测试"
+}

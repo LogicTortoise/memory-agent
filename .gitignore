@@ -1,0 +1,57 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Build / dist
+build/
+*.egg-info/
+# Root wheel/sdist outputs of `python -m build`. Anchored to repo root so
+# it does not match the packaged static assets under `src/memory_agent/ui/dist/`.
+/dist/
+
+# Vault, state, logs, secrets (NEVER commit)
+vault/
+state/
+logs/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.secrets/
+.cache/
+
+# Virtualenvs
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+
+# Historical research artifacts (not runtime state, kept out of tree)
+.history/
+.workspace/
+
+# Generated CLI fixture vault used by CLI subprocess tests / smoke runs.
+# Anchored to repo root so it does not collide with `src/memory_agent/...`.
+# P9's pytest runbook excludes it explicitly: `pytest tests/ --ignore=tests/v`.
+/tests/v/
+
+# Frontend dependencies and generated test/build artifacts
+node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+web/coverage/

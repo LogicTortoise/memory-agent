@@ -1,0 +1,15 @@
+# MANIFEST.in — source distribution extras
+#
+# The Vite build artefacts under src/memory_agent/ui/dist/ ship inside
+# the Python wheel via [tool.setuptools.package-data] in pyproject.toml.
+# The sdist also needs to ship them so a `pip install -e .` from an sdist
+# has them on disk before setuptools copies them into the installed
+# package. Without this include the hashed assets would be missing from
+# a clean sdist install and the bundled UI would 404 on /assets/*.
+
+include README.md
+include LICENSE
+include pyproject.toml
+
+recursive-include src/memory_agent/ui/dist *.html
+recursive-include src/memory_agent/ui/dist/assets *

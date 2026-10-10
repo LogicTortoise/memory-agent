@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "memory-agent"
+version = "1.0.0"
+description = "Local, file-backed memory agent with explicit, conservative extraction from Claude Code and Codex session logs."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Memory Agent Authors" }]
+keywords = ["memory", "knowledge", "claude-code", "codex"]
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Development Status :: 3 - Alpha",
+    "Topic :: Software Development :: Libraries",
+    "Operating System :: POSIX :: MacOS",
+]
+dependencies = [
+    "pydantic>=2.6,<3",
+    "PyYAML>=6.0,<7",
+    "fastapi>=0.110,<0.140",
+    "uvicorn>=0.27,<0.40",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "httpx>=0.27,<0.30",
+]
+
+[project.scripts]
+memory = "memory_agent.interfaces.cli.main:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"memory_agent.ui" = ["dist/index.html", "dist/assets/*"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-ra --strict-markers"
