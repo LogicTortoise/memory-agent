@@ -932,6 +932,26 @@ class _EmptyRepo:
 
 
 def test_pyproject_advertises_no_unverifiable_urls():
+    # Invert of the original v0.1 contract: there was no remote then, so
+    # pyproject was required to advertise nothing. The project now has a
+    # real remote at https://github.com/LogicTortoise/memory-agent, and
+    # install metadata must point at *that* — never at a stale or
+    # typo'd placeholder such as the old ``github.com/hungrytingus``
+    # string that this test previously guarded against.
     text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert "[project.urls]" not in text
     assert "github.com/hungrytingus/memory-agent" not in text
+    # When a remote is advertised, it must be the real one. Any
+    # ``[project.urls]`` table that does show up must point at the
+    # canonical remote below; nothing else is permitted.
+    if "[project.urls]" in text:
+        import tomllib
+        with (ROOT / "pyproject.toml").open("rb") as fh:
+            cfg = tomllib.load(fh)
+        urls = cfg.get("project", {}).get("urls", {})
+        assert urls, "[project.urls] is present but empty"
+        canonical = "https://github.com/LogicTortoise/memory-agent"
+        for label, target in urls.items():
+            assert target.startswith(canonical), (
+                f"[project.urls].{label}={target!r} is not the canonical remote "
+                f"(expected to start with {canonical!r})"
+            )
