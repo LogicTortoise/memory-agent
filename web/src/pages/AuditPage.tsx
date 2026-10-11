@@ -9,9 +9,12 @@ import {
   StatusPill,
   formatTimestamp,
 } from "../components/primitives";
+import { Card } from "../components/Card";
+import { CardCarousel } from "../components/CardCarousel";
 import { useAuditEvents, useClient } from "../hooks/queries";
+import { useDetail } from "../components/DetailContext";
 import { HttpError } from "../api/client";
-import type { CommandResponse } from "../api/contracts";
+import type { AuditEventDTO, CommandResponse } from "../api/contracts";
 
 function toneForOutcome(outcome: string): "ok" | "pending" | "error" | "muted" {
   switch (outcome) {
@@ -33,6 +36,7 @@ export function AuditPage() {
   const [jobState, setJobState] = useState<CommandResponse | null>(null);
   const [jobError, setJobError] = useState<Error | null>(null);
   const client = useClient();
+  const detail = useDetail();
 
   // Light polling on job state when the operator has asked.
   useEffect(() => {
@@ -95,37 +99,34 @@ export function AuditPage() {
         <Banner tone="ok" title="没有审计事件" />
       )}
       {audit.data && audit.data.items.length > 0 && (
-        <Section title={`审计（${audit.data.items.length}）`}>
-          <table role="grid" aria-label="audit events">
-            <thead>
-              <tr>
-                <th>seq</th>
-                <th>时间</th>
-                <th>动作</th>
-                <th>对象</th>
-                <th>actor</th>
-                <th>outcome</th>
-              </tr>
-            </thead>
-            <tbody>
-              {audit.data.items.map((ev) => (
-                <tr key={ev.audit_id} data-testid={`audit-row-${ev.audit_id}`}>
-                  <td className="mono">{ev.seq}</td>
-                  <td>{formatTimestamp(ev.occurred_at)}</td>
-                  <td className="mono">{ev.action}</td>
-                  <td className="mono" style={{ wordBreak: "break-all" }}>
-                    {ev.object_type ? `${ev.object_type}:` : ""}
-                    {ev.object_id ?? "—"}
-                  </td>
-                  <td className="mono">{ev.actor}</td>
-                  <td>
-                    <StatusPill tone={toneForOutcome(ev.outcome)}>{ev.outcome}</StatusPill>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Section>
+        <CardCarousel
+          title="审计"
+          count={audit.data.items.length}
+          data-testid="audit-carousel"
+        >
+          {audit.data.items.map((ev) => (
+            <Card
+              key={ev.audit_id}
+              variant="swipe"
+              data-testid={`audit-row-${ev.audit_id}`}
+              aria-label={ev.action}
+              onClick={() =>
+                detail.open({ title: ev.action, content: <AuditEventPanel ev={ev} /> })
+              }
+            >
+              <div className="muted tnum" style={{ fontSize: 11 }}>#{ev.seq}</div>
+              <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
+                <span className="mono" style={{ fontSize: 13 }}>{ev.action}</span>
+              </div>
+              <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+                {formatTimestamp(ev.occurred_at)}
+              </div>
+              <div style={{ marginTop: 6 }}>
+                <StatusPill tone={toneForOutcome(ev.outcome)}>{ev.outcome}</StatusPill>
+              </div>
+            </Card>
+          ))}
+        </CardCarousel>
       )}
       <Section title="作业查询" right={
         jobId ? <button onClick={() => setJobId(null)}>关闭</button> : null
@@ -153,6 +154,40 @@ export function AuditPage() {
           </div>
         )}
       </Section>
+    </div>
+  );
+}
+
+function AuditEventPanel({ ev }: { ev: AuditEventDTO }) {
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+        <StatusPill tone={toneForOutcome(ev.outcome)}>{ev.outcome}</StatusPill>
+        <span className="muted tnum">#{ev.seq}</span>
+        <span className="muted">{formatTimestamp(ev.occurred_at)}</span>
+      </div>
+      <div className="muted" style={{ fontSize: 12 }}>action</div>
+      <div className="mono" style={{ marginTop: 4 }}>{ev.action}</div>
+      <div className="muted" style={{ fontSize: 12, marginTop: 12 }}>object</div>
+      <div className="mono" style={{ marginTop: 4 }}>
+        {ev.object_type ? `${ev.object_type}:` : ""}
+        {ev.object_id ?? "—"}
+      </div>
+      <div className="muted" style={{ fontSize: 12, marginTop: 12 }}>actor</div>
+      <div className="mono" style={{ marginTop: 4 }}>{ev.actor}</div>
+      <div className="muted" style={{ fontSize: 12, marginTop: 12 }}>audit_id</div>
+      <div className="mono" style={{ marginTop: 4 }}>{ev.audit_id}</div>
+      {ev.reason_code && (
+        <>
+          <div className="muted" style={{ fontSize: 12, marginTop: 12 }}>reason_code</div>
+          <div className="mono" style={{ marginTop: 4 }}>{ev.reason_code}</div>
+        </>
+      )}
+      {ev.redacted && (
+        <Banner tone="warn" title="已脱敏" >
+          该事件的 details / correlation / before_after 字段在审计层被部分或完全脱敏（依据 privacy 策略）。
+        </Banner>
+      )}
     </div>
   );
 }

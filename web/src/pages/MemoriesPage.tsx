@@ -5,10 +5,12 @@ import {
   EmptyState,
   ErrorState,
   PageTitle,
-  Section,
   StatusPill,
   formatTimestamp,
 } from "../components/primitives";
+import { Card } from "../components/Card";
+import { CardCarousel } from "../components/CardCarousel";
+import { useDetail } from "../components/DetailContext";
 import {
   useClient,
   useConflicts,
@@ -38,13 +40,13 @@ function toneForConflictStatus(status: string): "pending" | "ok" | "muted" | "er
 
 export function MemoriesPage() {
   const conflicts = useConflicts({ page_size: 50 });
+  const detail = useDetail();
   const [selectedConflictId, setSelectedConflictId] = useState<string | null>(null);
   useEffect(() => {
     if (!selectedConflictId && conflicts.data && conflicts.data.items.length > 0) {
       setSelectedConflictId(conflicts.data.items[0].conflict_id);
     }
   }, [conflicts.data, selectedConflictId]);
-  const focused = conflicts.data?.items.find((c) => c.conflict_id === selectedConflictId) ?? null;
 
   return (
     <div>
@@ -65,74 +67,44 @@ export function MemoriesPage() {
         </Banner>
       )}
       {conflicts.data && conflicts.data.items.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(360px, 1fr) minmax(480px, 1.4fr)",
-            gap: 16,
-          }}
+        <CardCarousel
+          title="冲突"
+          count={conflicts.data.items.length}
+          data-testid="memories-carousel"
         >
-          <Section title={`冲突（${conflicts.data.items.length}）`}>
-            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              {conflicts.data.items.map((c) => (
-                <li
-                  key={c.conflict_id}
-                  tabIndex={0}
-                  aria-selected={selectedConflictId === c.conflict_id}
-                  onClick={() => setSelectedConflictId(c.conflict_id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setSelectedConflictId(c.conflict_id);
-                    }
-                  }}
-                  style={{
-                    padding: 10,
-                    border: "1px solid var(--ma-line)",
-                    borderRadius: 4,
-                    marginBottom: 8,
-                    cursor: "pointer",
-                    background:
-                      selectedConflictId === c.conflict_id
-                        ? "rgba(49,93,146,0.10)"
-                        : "var(--ma-surface)",
-                  }}
-                  data-testid={`conflict-row-${c.conflict_id}`}
-                >
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <StatusPill tone={toneForConflictStatus(c.status)}>
-                      {c.status}
-                    </StatusPill>
-                    <span className="muted" style={{ fontSize: 12 }}>
-                      rev {c.revision}
-                    </span>
-                  </div>
-                  <div className="mono" style={{ marginTop: 4 }}>{c.conflict_id}</div>
-                  <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-                    opened {formatTimestamp(c.opened_at)}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Section>
-          <Section title="冲突详情与决定">
-            {!focused ? (
-              <EmptyState title="选择左侧冲突" />
-            ) : (
-              <ConflictDetail conflict={focused} />
-            )}
-          </Section>
-        </div>
+          {conflicts.data.items.map((c) => (
+            <Card
+              key={c.conflict_id}
+              variant="swipe"
+              data-testid={`conflict-row-${c.conflict_id}`}
+              aria-label={c.conflict_id}
+              onClick={() => {
+                setSelectedConflictId(c.conflict_id);
+                detail.open({
+                  title: c.conflict_id,
+                  content: <ConflictDetail conflict={c} />,
+                });
+              }}
+            >
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <StatusPill tone={toneForConflictStatus(c.status)}>{c.status}</StatusPill>
+                <span className="muted tnum" style={{ fontSize: 12 }}>rev {c.revision}</span>
+              </div>
+              <div className="mono" style={{ marginTop: 6, fontSize: 12, wordBreak: "break-all" }}>
+                {c.conflict_id}
+              </div>
+              <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+                opened {formatTimestamp(c.opened_at)}
+              </div>
+            </Card>
+          ))}
+        </CardCarousel>
       )}
     </div>
   );
 }
 
-interface ConflictDetailProps {
-  conflict: ConflictDTO;
-}
-
-function ConflictDetail({ conflict }: ConflictDetailProps) {
+function ConflictDetail({ conflict }: { conflict: ConflictDTO }) {
   const old = useMemoryHistory(conflict.old_memory_ref);
   const new_ = useMemoryHistory(conflict.new_memory_ref);
   const client = useClient();
@@ -161,12 +133,6 @@ function ConflictDetail({ conflict }: ConflictDetailProps) {
       setFeedback({ tone: "ok", message: `决定已应用：${action}` });
       setStaleSince(null);
     } catch (err) {
-      // The server returns stale-revision mismatches as
-      // ``INVALID_REQUEST`` (422) rather than a dedicated error code,
-      // because ``application/dispatch.py`` is shared with the CLI and
-      // the audit task treats ``IDEMPOTENCY_CONFLICT`` as the only 409.
-      // We treat anything that contains "stale" as the stale-revision
-      // case so the UI can disable the action buttons.
       const isStaleFromMessage =
         err instanceof CommandRejectedError &&
         /proposal_revision\s+\d+\s+is\s+stale/i.test(err.message);
@@ -253,10 +219,6 @@ function ConflictDetail({ conflict }: ConflictDetailProps) {
 }
 
 function isOpenConflict(status: string): boolean {
-  // The reconciler inserts conflicts as ``status='pending'`` (or
-  // ``'open'``); ``'decided'`` and ``'superseded'`` mean the user has
-  // already acted on the proposal. We accept both pending + open so
-  // the UI matches the actual data the server emits.
   return status === "open" || status === "pending";
 }
 
@@ -275,7 +237,7 @@ function RevisionColumn({
   );
   return (
     <div className="card" data-testid={testId}>
-      <div className="muted" style={{ fontSize: 12, textTransform: "uppercase" }}>
+      <div className="muted" style={{ fontSize: 12 }}>
         {label}
       </div>
       {!history && <div className="muted" style={{ marginTop: 6 }}>Loading…</div>}

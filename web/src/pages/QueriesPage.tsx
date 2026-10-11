@@ -5,14 +5,17 @@ import {
   EmptyState,
   ErrorState,
   PageTitle,
-  Section,
   StatusPill,
   formatTimestamp,
 } from "../components/primitives";
+import { Card } from "../components/Card";
+import { CardCarousel } from "../components/CardCarousel";
+import { useDetail } from "../components/DetailContext";
 import { useQueryTraceDetail, useQueryTraces } from "../hooks/queries";
 
 export function QueriesPage() {
   const traces = useQueryTraces({ page_size: 50 });
+  const detail = useDetail();
   const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
   useEffect(() => {
     if (!selectedTraceId && traces.data && traces.data.items.length > 0) {
@@ -30,62 +33,43 @@ export function QueriesPage() {
         </Banner>
       )}
       {traces.data && traces.data.items.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(280px, 1fr) minmax(480px, 1.4fr)",
-            gap: 16,
-          }}
+        <CardCarousel
+          title="查询"
+          count={traces.data.items.length}
+          data-testid="queries-carousel"
         >
-          <Section title={`查询（${traces.data.items.length}）`}>
-            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              {traces.data.items.map((t) => (
-                <li
-                  key={t.trace_id}
-                  tabIndex={0}
-                  onClick={() => setSelectedTraceId(t.trace_id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setSelectedTraceId(t.trace_id);
-                    }
-                  }}
-                  style={{
-                    padding: 8,
-                    border: "1px solid var(--ma-line)",
-                    borderRadius: 4,
-                    marginBottom: 8,
-                    cursor: "pointer",
-                    background:
-                      selectedTraceId === t.trace_id
-                        ? "rgba(49,93,146,0.10)"
-                        : "var(--ma-surface)",
-                  }}
-                  data-testid={`trace-row-${t.trace_id}`}
-                >
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <StatusPill tone="info">{t.retrieval}</StatusPill>
-                    <span className="muted" style={{ fontSize: 12 }}>
-                      {t.result_count} hits
-                    </span>
-                  </div>
-                  <div style={{ marginTop: 4 }}>{t.original_query ?? <span className="muted">（原 query 未记录）</span>}</div>
-                  <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
-                    {formatTimestamp(t.occurred_at)}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Section>
-          <Section title="查询详情">
-            {!selectedTraceId ? (
-              <EmptyState title="选择左侧查询" />
-            ) : (
-              <TraceDetail traceId={selectedTraceId} />
-            )}
-          </Section>
-        </div>
+          {traces.data.items.map((t) => (
+            <Card
+              key={t.trace_id}
+              variant="swipe"
+              data-testid={`trace-row-${t.trace_id}`}
+              aria-label={t.original_query ?? t.trace_id}
+              onClick={() => {
+                setSelectedTraceId(t.trace_id);
+                detail.open({
+                  title: t.original_query ?? t.trace_id,
+                  content: <TraceDetail traceId={t.trace_id} />,
+                });
+              }}
+            >
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <StatusPill tone="info">{t.retrieval}</StatusPill>
+                <span className="muted tnum" style={{ fontSize: 12 }}>{t.result_count} hits</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 14 }}>
+                {t.original_query ?? <span className="muted">（原 query 未记录）</span>}
+              </div>
+              <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
+                {formatTimestamp(t.occurred_at)}
+              </div>
+            </Card>
+          ))}
+        </CardCarousel>
       )}
+      {/* The selected trace's TraceDetail is rendered into the shared
+          DetailPanel via useDetail().open() above; nothing to render
+          in the main column otherwise. */}
+      {selectedTraceId && null}
     </div>
   );
 }

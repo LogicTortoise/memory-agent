@@ -6,11 +6,13 @@ import {
   EmptyState,
   ErrorState,
   PageTitle,
-  Section,
   StatusPill,
   formatNumber,
   formatTimestamp,
 } from "../components/primitives";
+import { Card } from "../components/Card";
+import { CardCarousel } from "../components/CardCarousel";
+import { useDetail } from "../components/DetailContext";
 import { useBatchDetail, useBatchEvidenceLazy, useBatches } from "../hooks/queries";
 import type { BatchEvidenceInputDTO } from "../api/contracts";
 
@@ -45,17 +47,12 @@ export function BatchesPage() {
     return items.filter((b) => b.session_id === sessionFilter);
   }, [items, sessionFilter]);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+  const detail = useDetail();
   useEffect(() => {
     if (!selectedBatchId && filteredItems.length > 0) {
       setSelectedBatchId(filteredItems[0].batch_id);
     }
   }, [filteredItems, selectedBatchId]);
-  const detail = useBatchDetail(selectedBatchId);
-
-  // Evidence is loaded lazily (only on explicit expansion).
-  const evidence = useBatchEvidenceLazy(selectedBatchId);
-  const [evidenceOpen, setEvidenceOpen] = useState(false);
-  const [highlightInput, setHighlightInput] = useState<string | null>(null);
 
   return (
     <div>
@@ -82,133 +79,104 @@ export function BatchesPage() {
         </Banner>
       )}
       {batches.data && items.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(360px, 1fr) minmax(480px, 1.4fr)",
-            gap: 16,
-          }}
+        <CardCarousel
+          title="批次列表"
+          count={filteredItems.length}
+          data-testid="batches-carousel"
         >
-          <Section title={`批次列表（${filteredItems.length}）`}>
-            <table role="grid" aria-label="batches">
-              <thead>
-                <tr>
-                  <th>batch_id</th>
-                  <th>session</th>
-                  <th>状态</th>
-                  <th>成员</th>
-                  <th>尝试</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredItems.map((b) => (
-                  <tr
-                    key={b.batch_id}
-                    tabIndex={0}
-                    aria-selected={selectedBatchId === b.batch_id}
-                    onClick={() => {
-                      setSelectedBatchId(b.batch_id);
-                      setEvidenceOpen(false);
-                      setHighlightInput(null);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setSelectedBatchId(b.batch_id);
-                        setEvidenceOpen(false);
-                        setHighlightInput(null);
-                      }
-                    }}
-                    style={
-                      selectedBatchId === b.batch_id
-                        ? { background: "rgba(49,93,146,0.10)" }
-                        : undefined
-                    }
-                    data-testid={`batch-row-${b.batch_id}`}
-                  >
-                    <td className="mono" style={{ wordBreak: "break-all" }}>
-                      {b.batch_id}
-                    </td>
-                    <td>
-                      <div>{b.session_id}</div>
-                      <div className="muted" style={{ fontSize: 12 }}>{b.branch_id}</div>
-                    </td>
-                    <td>
-                      <StatusPill tone={toneForBatchStatus(b.status)} data-testid={`batch-status-${b.batch_id}`}>
-                        {b.status}
-                      </StatusPill>
-                      <div className="muted" style={{ fontSize: 11 }}>
-                        {formatTimestamp(b.created_at)}
-                      </div>
-                    </td>
-                    <td>{formatNumber(b.member_count)}</td>
-                    <td>{b.attempt}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Section>
-
-          <Section
-            title={selectedBatchId ? `批次 ${selectedBatchId}` : "未选中批次"}
-            right={
-              detail.data && detail.data.commit_id ? (
-                <span className="muted" style={{ fontSize: 12 }} data-testid="batch-commit-id">
-                  commit={detail.data.commit_id.slice(0, 12)}…
-                </span>
-              ) : null
-            }
-          >
-            {!detail.data ? (
-              <EmptyState title="选择左侧批次" />
-            ) : (
-              <div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-                    gap: 8,
-                    marginBottom: 12,
-                  }}
-                >
-                  <Tile label="policy" value={detail.data.policy_version} />
-                  <Tile label="input_hash" value={detail.data.input_hash.slice(0, 10) + "…"} mono />
-                  <Tile label="active" value={String(detail.data.members.filter((m) => m.active_target).length)} />
-                  <Tile label="context" value={String(detail.data.members.filter((m) => !m.active_target).length)} />
-                </div>
-                <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-                  原话与候选对照不会自动加载；点击下方按钮按需展开。
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEvidenceOpen(true);
-                    evidence.refresh();
-                  }}
-                  aria-expanded={evidenceOpen}
-                  data-testid="expand-evidence"
-                >
-                  {evidenceOpen ? "重新展开原话/候选对照" : "展开原话/候选对照"}
-                </button>
-                {evidenceOpen && (
-                  <div style={{ marginTop: 12 }}>
-                    {evidence.error && <ErrorState error={evidence.error} />}
-                    {!evidence.data && !evidence.error && (
-                      <EmptyState title="Loading…" hint="读取 batch evidence" />
-                    )}
-                    {evidence.data && (
-                      <EvidenceView
-                        inputs={evidence.data.inputs as BatchEvidenceInputDTO[]}
-                        candidates={evidence.data.candidates}
-                        highlightInput={highlightInput}
-                        onSelectInput={setHighlightInput}
-                      />
-                    )}
-                  </div>
-                )}
+          {filteredItems.map((b) => (
+            <Card
+              key={b.batch_id}
+              variant="swipe"
+              data-testid={`batch-row-${b.batch_id}`}
+              aria-label={b.batch_id}
+              onClick={() => {
+                setSelectedBatchId(b.batch_id);
+                detail.open({
+                  title: b.batch_id,
+                  content: <BatchDetailPanel batchId={b.batch_id} />,
+                });
+              }}
+            >
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <StatusPill tone={toneForBatchStatus(b.status)} data-testid={`batch-status-${b.batch_id}`}>
+                  {b.status}
+                </StatusPill>
+                <span className="muted tnum" style={{ fontSize: 12 }}>{formatNumber(b.member_count)} members</span>
               </div>
-            )}
-          </Section>
+              <div className="mono" style={{ marginTop: 6, fontSize: 12, wordBreak: "break-all" }}>
+                {b.session_id}
+              </div>
+              <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+                {b.branch_id} · attempt {b.attempt} · {formatTimestamp(b.created_at)}
+              </div>
+            </Card>
+          ))}
+        </CardCarousel>
+      )}
+    </div>
+  );
+}
+
+function BatchDetailPanel({ batchId }: { batchId: string }) {
+  const detail = useBatchDetail(batchId);
+  const evidence = useBatchEvidenceLazy(batchId);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [highlightInput, setHighlightInput] = useState<string | null>(null);
+  return (
+    <div>
+      {!detail.data ? (
+        <EmptyState title="Loading…" />
+      ) : (
+        <div>
+          {detail.data.commit_id && (
+            <div className="muted" style={{ fontSize: 12, marginBottom: 8 }} data-testid="batch-commit-id">
+              commit={detail.data.commit_id.slice(0, 12)}…
+            </div>
+          )}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+              gap: 8,
+              marginBottom: 12,
+            }}
+          >
+            <Tile label="policy" value={detail.data.policy_version} />
+            <Tile label="input_hash" value={detail.data.input_hash.slice(0, 10) + "…"} mono />
+            <Tile label="active" value={String(detail.data.members.filter((m) => m.active_target).length)} />
+            <Tile label="context" value={String(detail.data.members.filter((m) => !m.active_target).length)} />
+          </div>
+          <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+            原话与候选对照不会自动加载；点击下方按钮按需展开。
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setEvidenceOpen(true);
+              evidence.refresh();
+            }}
+            aria-expanded={evidenceOpen}
+            data-testid="expand-evidence"
+          >
+            {evidenceOpen ? "重新展开原话/候选对照" : "展开原话/候选对照"}
+          </button>
+          {evidenceOpen && (
+            <div style={{ marginTop: 12 }}>
+              {evidence.error && <ErrorState error={evidence.error} />}
+              {!evidence.data && !evidence.error && (
+                <EmptyState title="Loading…" hint="读取 batch evidence" />
+              )}
+              {evidence.data && (
+                <EvidenceView
+                  inputs={evidence.data.inputs as BatchEvidenceInputDTO[]}
+                  candidates={evidence.data.candidates}
+                  highlightInput={highlightInput}
+                  onSelectInput={setHighlightInput}
+                />
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -218,7 +186,7 @@ export function BatchesPage() {
 function Tile({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="card" style={{ padding: "10px 12px" }}>
-      <div className="muted" style={{ fontSize: 11, textTransform: "uppercase" }}>
+      <div className="muted" style={{ fontSize: 11 }}>
         {label}
       </div>
       <div className={mono ? "mono" : ""} style={{ marginTop: 4, fontSize: 13, wordBreak: "break-all" }}>
@@ -236,7 +204,6 @@ interface EvidenceViewProps {
 }
 
 function EvidenceView({ inputs, candidates, highlightInput, onSelectInput }: EvidenceViewProps) {
-  // Stable sort: active targets first, then context_only.
   const sorted = useMemo(
     () => [...inputs].sort((a, b) => Number(b.active_target) - Number(a.active_target)),
     [inputs],

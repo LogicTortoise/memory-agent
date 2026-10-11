@@ -47,36 +47,45 @@ test.describe.serial("P7/T15 audit UI", () => {
         .getByRole("link", { name: "会话与来源" })
         .click();
       await expect(page.getByRole("heading", { name: "会话与来源" })).toBeVisible();
-      const sourceRow = page.locator("table tbody tr").first();
+      await expect(page.locator("[data-testid^='source-card-']").first()).toBeVisible({ timeout: 10_000 });
+      const sourceRow = page.locator("[data-testid^='source-card-']").first();
       await sourceRow.click();
-      // Sessions/turns preview appears on the right.
-      await expect(page.getByRole("heading", { name: /的轮次|未选中来源/ })).toBeVisible();
+      // Sessions/turns preview opens in the shared DetailPanel.
+      await expect(page.getByTestId("detail-panel-close")).toBeVisible({ timeout: 5_000 });
+      // Close the panel so the next nav click doesn't have to deal
+      // with focus inside the dialog.
+      await page.getByTestId("detail-panel-close").click();
+      await expect(page.getByTestId("detail-panel-close")).toBeHidden({ timeout: 5_000 });
 
       // Batches
       await page.getByRole("navigation", { name: "Audit sections" })
         .getByRole("link", { name: "处理批次" })
         .click();
-      await expect(page.getByRole("heading", { name: "处理批次" })).toBeVisible();
-      const batchRow = page.locator("table tbody tr").first();
+      await expect(page.getByRole("heading", { name: "处理批次" })).toBeVisible({ timeout: 5_000 });
+      await expect(page.locator("[data-testid^='batch-row-']").first()).toBeVisible({ timeout: 10_000 });
+      const batchRow = page.locator("[data-testid^='batch-row-']").first();
       await batchRow.click();
       // Original text is hidden until the user explicitly expands it.
-      await expect(page.getByTestId("expand-evidence")).toBeVisible();
+      await expect(page.getByTestId("expand-evidence")).toBeVisible({ timeout: 5_000 });
       // Click to load inputs + candidates; the evidence UI surfaces the
       // span locator.
       await page.getByTestId("expand-evidence").click();
       await expect(page.locator("[data-testid^='evidence-input-']").first()).toBeVisible({ timeout: 10_000 });
-      await expect(page.locator("text=locator: bytes").first()).toBeVisible();
+      await expect(page.locator("text=locator: bytes").first()).toBeVisible({ timeout: 5_000 });
 
       // Memories / decisions
+      await page.getByTestId("detail-panel-close").click();
+      await expect(page.getByTestId("detail-panel-close")).toBeHidden({ timeout: 5_000 });
       await page.getByRole("navigation", { name: "Audit sections" })
         .getByRole("link", { name: "记忆与决定" })
         .click();
-      await expect(page.getByRole("heading", { name: "记忆与决定" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "记忆与决定" })).toBeVisible({ timeout: 5_000 });
+      await expect(page.locator("[data-testid^='conflict-row-']").first()).toBeVisible({ timeout: 10_000 });
       const conflictRow = page.locator("[data-testid^='conflict-row-']").first();
       await conflictRow.click();
-      await expect(page.getByTestId("conflict-detail")).toBeVisible();
-      await expect(page.getByTestId("decide-keep-old")).toBeEnabled();
-      await expect(page.getByTestId("decide-adopt-new")).toBeEnabled();
+      await expect(page.getByTestId("conflict-detail")).toBeVisible({ timeout: 5_000 });
+      await expect(page.getByTestId("decide-keep-old")).toBeEnabled({ timeout: 5_000 });
+      await expect(page.getByTestId("decide-adopt-new")).toBeEnabled({ timeout: 5_000 });
     } finally {
       teardownFixture(fx);
       

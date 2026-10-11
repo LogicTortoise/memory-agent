@@ -93,6 +93,7 @@ const DetailPanel = forwardRef<HTMLDivElement, DetailPanelProps>(
           data-open={open ? "open" : undefined}
           onClick={onClose}
           aria-hidden="true"
+          style={open ? undefined : { display: "none" }}
         />
       </>
     );

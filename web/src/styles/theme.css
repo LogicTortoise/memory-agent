@@ -408,7 +408,7 @@ tbody tr:focus-within, tbody tr:hover { background: rgba(49, 93, 146, 0.04); }
 .detail-panel__backdrop {
   position: fixed;
   top: 56px;
-  left: 0;
+  left: var(--ma-nav-width, 220px);
   right: 0;
   bottom: 0;
   background: rgba(32, 48, 74, 0.18);

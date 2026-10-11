@@ -1,30 +1,37 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useState } from "react";
 
 import {
   Banner,
   EmptyState,
   ErrorState,
   PageTitle,
-  Section,
   StatusPill,
   formatNumber,
 } from "../components/primitives";
+import { Card } from "../components/Card";
+import { CardCarousel } from "../components/CardCarousel";
+import { useDetail } from "../components/DetailContext";
 import { useSessionTurns, useSources } from "../hooks/queries";
+import type { SourceDTO, SessionTurnDTO } from "../api/contracts";
+
+function toneForSource(s: {
+  last_status: string | null;
+  pending_partial_tail: boolean;
+  last_error: string | null;
+  file_present: boolean;
+}): "ok" | "pending" | "error" | "muted" {
+  if (!s.file_present) return "error";
+  if (s.last_error) return "error";
+  if (s.pending_partial_tail) return "pending";
+  if (s.last_status === "ready" || s.last_status === "ok") return "ok";
+  return "muted";
+}
 
 export function SourcesPage() {
-  const [connector, setConnector] = useState("");
+  const [connector, setConnector] = useState<string>("");
   const sources = useSources({ connector: connector || null, page_size: 50 });
   const items = sources.data?.items ?? [];
-  const [selectedSourceFileId, setSelectedSourceFileId] = useState<string | null>(null);
-
-  // The session id of the currently focused source — for the turns panel.
-  const focusedSessionId = useMemo(() => {
-    const focused = items.find((s) => s.source_file_id === selectedSourceFileId);
-    return focused?.session_id ?? null;
-  }, [items, selectedSourceFileId]);
-
-  const turns = useSessionTurns({ session_id: focusedSessionId });
+  const detail = useDetail();
 
   return (
     <div>
@@ -53,127 +60,131 @@ export function SourcesPage() {
         </Banner>
       )}
       {sources.data && items.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(360px, 1fr) minmax(360px, 1fr)",
-            gap: 16,
-          }}
+        <CardCarousel
+          title="来源"
+          count={items.length}
+          data-testid="sources-carousel"
         >
-          <Section title={`来源（${items.length}）`}>
-            <table role="grid" aria-label="source files">
-              <thead>
-                <tr>
-                  <th>路径 / 会话</th>
-                  <th>连接器</th>
-                  <th>世代</th>
-                  <th>游标</th>
-                  <th>状态</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((s) => (
-                  <tr
-                    key={s.source_file_id}
-                    tabIndex={0}
-                    aria-selected={selectedSourceFileId === s.source_file_id}
-                    onClick={() => setSelectedSourceFileId(s.source_file_id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setSelectedSourceFileId(s.source_file_id);
-                      }
-                    }}
-                    style={
-                      selectedSourceFileId === s.source_file_id
-                        ? { background: "rgba(49,93,146,0.10)" }
-                        : undefined
-                    }
-                  >
-                    <td>
-                      <div className="mono" style={{ wordBreak: "break-all" }}>{s.canonical_path}</div>
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        session={s.session_id} branch={s.branch_id}
-                      </div>
-                    </td>
-                    <td>{s.connector}</td>
-                    <td>g{s.generation}/r{s.revision_seq}</td>
-                    <td>
-                      {formatNumber(s.complete_offset)} /{" "}
-                      {formatNumber(s.size)}
-                    </td>
-                    <td>
-                      <StatusPill tone={toneForSource(s)}>{s.last_status ?? "—"}</StatusPill>
-                      {s.pending_partial_tail && (
-                        <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
-                          等待记录写完
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Section>
-          <Section
-            title={
-              focusedSessionId
-                ? `会话 ${focusedSessionId} 的轮次`
-                : "未选中来源"
-            }
-            right={
-              focusedSessionId ? (
-                <Link to={`/batches?session=${focusedSessionId}`}>
-                  <button>查看批次</button>
-                </Link>
-              ) : null
-            }
-          >
-            {!focusedSessionId ? (
-              <EmptyState title="选择左侧来源" hint="展示其 session 下的轮次与原话预览" />
-            ) : turns.error ? (
-              <ErrorState error={turns.error} />
-            ) : !turns.data ? (
-              <EmptyState title="Loading…" />
-            ) : (
-              <ol style={{ paddingLeft: 18 }}>
-                {turns.data.items.map((t) => (
-                  <li key={t.turn_id} style={{ marginBottom: 10 }}>
-                    <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
-                      <strong>#{t.ordinal}</strong>
-                      <span className="muted">role={t.role ?? "?"}</span>
-                      <StatusPill tone={t.state === "closed" ? "ok" : "pending"}>
-                        {t.state}
-                      </StatusPill>
-                    </div>
-                    <div
-                      className="mono-block"
-                      style={{ marginTop: 4 }}
-                      data-testid={`turn-preview-${t.turn_id}`}
-                    >
-                      {t.quote_preview ?? <span className="muted">（无原话预览）</span>}
-                      {t.quote_redacted && <span className="muted">…（已截断，原文请到批次证据页）</span>}
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </Section>
-        </div>
+          {items.map((s) => (
+            <Card
+              key={s.source_file_id}
+              variant="swipe"
+              data-testid={`source-card-${s.source_file_id}`}
+              aria-label={`${s.connector} · ${s.session_id}`}
+              onClick={() =>
+                detail.open({
+                  title: `${s.connector} · ${s.session_id}`,
+                  content: <SourceDetailPanel source={s} />,
+                })
+              }
+            >
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <span className="mono" style={{ fontSize: 12 }}>{s.connector}</span>
+                <StatusPill tone={toneForSource(s)}>{s.last_status ?? "—"}</StatusPill>
+              </div>
+              <div className="mono" style={{ fontSize: 13, marginTop: 6, wordBreak: "break-all" }}>
+                {s.session_id}
+              </div>
+              <div className="muted tnum" style={{ fontSize: 11, marginTop: 6 }}>
+                gen {s.generation} / rev {s.revision_seq}
+              </div>
+              <div className="muted tnum" style={{ fontSize: 11, marginTop: 2 }}>
+                cursor {formatNumber(s.complete_offset)} / {formatNumber(s.size)}
+              </div>
+              {s.pending_partial_tail && (
+                <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+                  等待记录写完
+                </div>
+              )}
+            </Card>
+          ))}
+        </CardCarousel>
       )}
     </div>
   );
 }
 
-function toneForSource(s: {
-  last_status: string | null;
-  pending_partial_tail: boolean;
-  last_error: string | null;
-  file_present: boolean;
-}): "ok" | "pending" | "error" | "muted" {
-  if (!s.file_present) return "error";
-  if (s.last_error) return "error";
-  if (s.pending_partial_tail) return "pending";
-  if (s.last_status === "ready" || s.last_status === "ok") return "ok";
-  return "muted";
+// Tiny helper because the connector state lives only here.
+// (no helper needed — useState directly in the component above)
+
+function SourceDetailPanel({ source }: { source: SourceDTO }) {
+  const turns = useSessionTurns({ session_id: source.session_id });
+  return (
+    <div>
+      <div className="muted" style={{ fontSize: 12 }}>canonical_path</div>
+      <div className="mono" style={{ wordBreak: "break-all", marginTop: 4 }}>
+        {source.canonical_path}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+        <KV label="connector" value={source.connector} />
+        <KV label="branch" value={source.branch_id} />
+        <KV label="generation / revision" value={`${source.generation} / ${source.revision_seq}`} />
+        <KV
+          label="cursor / size"
+          value={`${formatNumber(source.complete_offset)} / ${formatNumber(source.size)}`}
+        />
+        <KV label="last_status" value={source.last_status ?? "—"} />
+        <KV
+          label="file_present"
+          value={source.file_present ? "yes" : "no"}
+        />
+      </div>
+      {source.last_error && (
+        <Banner tone="error" title="last_error" >
+          <div className="mono">{source.last_error}</div>
+        </Banner>
+      )}
+      <h3 style={{ fontSize: 14, margin: "16px 0 8px" }}>
+        会话 {source.session_id} 的轮次
+      </h3>
+      {turns.error ? (
+        <ErrorState error={turns.error} />
+      ) : !turns.data ? (
+        <EmptyState title="Loading…" />
+      ) : turns.data.items.length === 0 ? (
+        <div className="muted">（该会话无轮次）</div>
+      ) : (
+        <TurnList turns={turns.data.items} />
+      )}
+    </div>
+  );
+}
+
+function TurnList({ turns }: { turns: SessionTurnDTO[] }) {
+  return (
+    <ol style={{ paddingLeft: 18, margin: 0 }}>
+      {turns.map((t) => (
+        <li key={t.turn_id} style={{ marginBottom: 10 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+            <strong>#{t.ordinal}</strong>
+            <span className="muted">role={t.role ?? "?"}</span>
+            <StatusPill tone={t.state === "closed" ? "ok" : "pending"}>
+              {t.state}
+            </StatusPill>
+          </div>
+          <div
+            className="mono-block"
+            style={{ marginTop: 4 }}
+            data-testid={`turn-preview-${t.turn_id}`}
+          >
+            {t.quote_preview ?? <span className="muted">（无原话预览）</span>}
+            {t.quote_redacted && (
+              <span className="muted">…（已截断，原文请到批次证据页）</span>
+            )}
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function KV({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="card" style={{ padding: "10px 12px" }}>
+      <div className="muted" style={{ fontSize: 11 }}>{label}</div>
+      <div className="mono tnum" style={{ marginTop: 4, fontSize: 13 }}>
+        {value}
+      </div>
+    </div>
+  );
 }
