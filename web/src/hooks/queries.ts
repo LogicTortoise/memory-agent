@@ -160,6 +160,7 @@ export function useAuditEvents(args: {
   object_id?: string | null;
   seq_min?: number | null;
   seq_max?: number | null;
+  q?: string | null;
 }) {
   const client = useClient();
   const fetcher = useMemo(
@@ -173,6 +174,7 @@ export function useAuditEvents(args: {
       args.object_id ?? null,
       args.seq_min ?? null,
       args.seq_max ?? null,
+      args.q ?? null,
     ],
   );
   return usePolling<PagedResponse<AuditEventDTO>>(fetcher);
@@ -181,11 +183,12 @@ export function useAuditEvents(args: {
 export function useQueryTraces(args: {
   cursor?: string | null;
   page_size?: number;
+  q?: string | null;
 }) {
   const client = useClient();
   const fetcher = useMemo(
     () => () => client.listQueryTraces(args),
-    [client, args.cursor ?? null, args.page_size ?? 25],
+    [client, args.cursor ?? null, args.page_size ?? 25, args.q ?? null],
   );
   return usePolling<PagedResponse<QueryTraceDTO>>(fetcher);
 }

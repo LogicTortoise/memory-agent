@@ -14,7 +14,8 @@ import { useDetail } from "../components/DetailContext";
 import { useQueryTraceDetail, useQueryTraces } from "../hooks/queries";
 
 export function QueriesPage() {
-  const traces = useQueryTraces({ page_size: 50 });
+  const [search, setSearch] = useState("");
+  const traces = useQueryTraces({ page_size: 50, q: search.trim() || null });
   const detail = useDetail();
   const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
   useEffect(() => {
@@ -24,7 +25,21 @@ export function QueriesPage() {
   }, [traces.data, selectedTraceId]);
   return (
     <div>
-      <PageTitle title="查询审计" subtitle="原 query、改写/扩写、变体命中与依据" />
+      <PageTitle
+        title="查询审计"
+        subtitle="原 query、改写/扩写、变体命中与依据"
+        right={
+          <input
+            type="search"
+            aria-label="Query trace search"
+            placeholder="搜索 trace_id / 原 query / 变体…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            data-testid="queries-search-input"
+            style={{ minWidth: 220 }}
+          />
+        }
+      />
       {traces.error && <ErrorState error={traces.error} />}
       {!traces.data && !traces.error && <EmptyState title="Loading…" />}
       {traces.data && traces.data.items.length === 0 && (

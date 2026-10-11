@@ -180,6 +180,7 @@ export class MemoryAgentClient {
     if (args.object_id) qs.set("object_id", args.object_id);
     if (args.seq_min != null) qs.set("seq_min", String(args.seq_min));
     if (args.seq_max != null) qs.set("seq_max", String(args.seq_max));
+    if (args.q) qs.set("q", args.q);
     return this.getJson<PagedResponse<AuditEventDTO>>(`/api/v1/audit?${qs}`);
   }
 
@@ -191,6 +192,7 @@ export class MemoryAgentClient {
     const qs = new URLSearchParams();
     if (args.cursor) qs.set("cursor", args.cursor);
     if (args.page_size) qs.set("page_size", String(args.page_size));
+    if (args.q) qs.set("q", args.q);
     return this.getJson<PagedResponse<QueryTraceDTO>>(`/api/v1/queries?${qs}`);
   }
 

@@ -31,7 +31,12 @@ function toneForOutcome(outcome: string): "ok" | "pending" | "error" | "muted" {
 
 export function AuditPage() {
   const [actionFilter, setActionFilter] = useState("");
-  const audit = useAuditEvents({ page_size: 50, action: actionFilter || null });
+  const [search, setSearch] = useState("");
+  const audit = useAuditEvents({
+    page_size: 50,
+    action: actionFilter || null,
+    q: search.trim() || null,
+  });
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobState, setJobState] = useState<CommandResponse | null>(null);
   const [jobError, setJobError] = useState<Error | null>(null);
@@ -77,20 +82,31 @@ export function AuditPage() {
         title="审计与作业"
         subtitle="审计事件流、按 action/object 过滤；查询异步作业状态"
         right={
-          <select
-            aria-label="Action filter"
-            value={actionFilter}
-            onChange={(e) => setActionFilter(e.target.value)}
-          >
-            <option value="">全部动作</option>
-            <option value="source.discovered">source.discovered</option>
-            <option value="batch.extracted">batch.extracted</option>
-            <option value="memory.committed">memory.committed</option>
-            <option value="conflict.opened">conflict.opened</option>
-            <option value="conflict.decided">conflict.decided</option>
-            <option value="query.retrieved">query.retrieved</option>
-            <option value="recovery.finalized">recovery.finalized</option>
-          </select>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              type="search"
+              aria-label="Audit search"
+              placeholder="搜索 action / object_id / details…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              data-testid="audit-search-input"
+              style={{ minWidth: 220 }}
+            />
+            <select
+              aria-label="Action filter"
+              value={actionFilter}
+              onChange={(e) => setActionFilter(e.target.value)}
+            >
+              <option value="">全部动作</option>
+              <option value="source.discovered">source.discovered</option>
+              <option value="batch.extracted">batch.extracted</option>
+              <option value="memory.committed">memory.committed</option>
+              <option value="conflict.opened">conflict.opened</option>
+              <option value="conflict.decided">conflict.decided</option>
+              <option value="query.retrieved">query.retrieved</option>
+              <option value="recovery.finalized">recovery.finalized</option>
+            </select>
+          </div>
         }
       />
       {audit.error && <ErrorState error={audit.error} />}

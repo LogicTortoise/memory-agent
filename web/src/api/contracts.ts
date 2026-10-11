@@ -289,8 +289,10 @@ export type ListAuditArgs = {
   object_id?: string | null;
   seq_min?: number | null;
   seq_max?: number | null;
+  q?: string | null;
 };
 export type ListQueryTracesArgs = {
   cursor?: string | null;
   page_size?: number;
+  q?: string | null;
 };

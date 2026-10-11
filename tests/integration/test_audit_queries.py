@@ -629,6 +629,138 @@ def test_query_traces_list_and_detail_use_persisted_artifact(
     assert any(v.get("origin") == "original" for v in detail.variants_full)
 
 
+def test_audit_list_q_filter_matches_action_object_and_details(
+    tmp_path: Path,
+) -> None:
+    """``q`` on /api/v1/audit must match against ``action``,
+    ``object_id``, and ``details_json`` (LIKE-escaped)."""
+
+    vault, conn = _fresh_vault(tmp_path)
+    _seed_full_pipeline(
+        vault=vault,
+        conn=conn,
+        session_id="sess_q_filter",
+        user_lines=["use Python for the prototype"],
+    )
+    svc = AuditQueries(vault=vault)
+    # Sanity: at least one row exists.
+    base = svc.list_audit_events(conn=conn, cursor=None, page_size=200)
+    assert len(base.items) > 0
+
+    # 1. q="batch" must match ``batch.extracted`` action rows.
+    matched = svc.list_audit_events(
+        conn=conn, cursor=None, page_size=200, q="batch"
+    )
+    assert matched.items, "q='batch' should match batch.extracted rows"
+    for item in matched.items:
+        assert (
+            "batch" in (item.get("action") or "").lower()
+            or "batch" in (item.get("object_id") or "").lower()
+            or "batch" in str(item.get("details") or "").lower()
+        )
+
+    # 2. q that targets an object_id fragment.
+    sample = base.items[0]
+    obj_id = sample.get("object_id") or ""
+    if obj_id:
+        # Use a short distinguishing prefix that is unlikely to be a
+        # LIKE wildcard by accident.
+        needle = obj_id[:6]
+        matched_obj = svc.list_audit_events(
+            conn=conn, cursor=None, page_size=200, q=needle
+        )
+        assert matched_obj.items, (
+            f"q={needle!r} (prefix of object_id) should match"
+        )
+        assert any(it.get("audit_id") == sample["audit_id"] for it in matched_obj.items)
+
+    # 3. q that matches nothing must yield zero rows.
+    empty = svc.list_audit_events(
+        conn=conn, cursor=None, page_size=200, q="zzzzzzzz_no_match_zzzzzzzz"
+    )
+    assert empty.items == []
+
+
+def test_query_traces_q_filter_reads_persisted_artifact(
+    tmp_path: Path,
+) -> None:
+    """``q`` on /api/v1/queries must read each trace artifact and
+    match against the *query text inside it* (not just the audit row)."""
+
+    vault, conn = _fresh_vault(tmp_path)
+    _seed_full_pipeline(
+        vault=vault,
+        conn=conn,
+        session_id="sess_trace_q",
+        user_lines=["use Python for the prototype always"],
+    )
+    svc = AuditQueries(vault=vault)
+    base = svc.list_query_traces(conn=conn, cursor=None, page_size=10)
+    assert base.items, "fixture should produce at least one query trace"
+
+    # Pick a needle that lives inside the trace artifact body — the
+    # user-message text gets recorded verbatim into the artifact JSON.
+    needle = "prototype always"
+    matched = svc.list_query_traces(
+        conn=conn, cursor=None, page_size=10, q=needle
+    )
+    assert matched.items, (
+        f"q='{needle}' should match the query text inside the artifact"
+    )
+    for it in matched.items:
+        artifact = vault.artifacts_dir / "queries" / f"{it['trace_id']}.json"
+        assert artifact.exists()
+        body = json.loads(artifact.read_text(encoding="utf-8"))
+        haystack = json.dumps(body, ensure_ascii=False)
+        assert needle.lower() in haystack.lower()
+
+    # q="zzzz" — never matches.
+    empty = svc.list_query_traces(
+        conn=conn, cursor=None, page_size=10, q="zzzz_no_match"
+    )
+    assert empty.items == []
+
+
+def test_audit_q_filter_escapes_like_wildcards(tmp_path: Path) -> None:
+    """An operator searching for a literal ``%`` must not get
+    accidental matches from SQLite LIKE wildcards."""
+
+    vault, conn = _fresh_vault(tmp_path)
+    _seed_full_pipeline(
+        vault=vault,
+        conn=conn,
+        session_id="sess_q_escape",
+        user_lines=["use Python for the prototype"],
+    )
+    svc = AuditQueries(vault=vault)
+    base = svc.list_audit_events(conn=conn, cursor=None, page_size=200)
+    base_count = len(base.items)
+    assert base_count > 0
+
+    # ``_like_pattern`` escapes ``%`` to ``\%``. With ``ESCAPE '\\'``
+    # in the SQL, ``\%`` becomes a literal ``%``. A naive
+    # ``LIKE '%%%'`` would match every row; the escaped version
+    # only matches rows whose text literally contains a ``%`` —
+    # which is none in the seeded fixture (no row text contains it).
+    pct = svc.list_audit_events(
+        conn=conn, cursor=None, page_size=200, q="%"
+    )
+    assert pct.items == [], (
+        "q='%' must match zero rows (escape means % is literal, not "
+        "a wildcard); got "
+        f"{[it['action'] for it in pct.items]}"
+    )
+
+    # Sanity: a deliberately-wide substring DOES match every row, so
+    # we know the filter works at all.
+    wide = svc.list_audit_events(
+        conn=conn, cursor=None, page_size=200, q="a"
+    )
+    assert len(wide.items) == base_count, (
+        "q='a' must match every row in the seeded audit log"
+    )
+
+
 def test_cursor_is_snapshot_bound_and_rejected_on_advance(
     tmp_path: Path,
 ) -> None:

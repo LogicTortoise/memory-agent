@@ -271,6 +271,19 @@ def _row_to_dict(row: Any) -> dict[str, Any]:
     return {k: row[k] for k in row.keys()}
 
 
+def _like_pattern(q: str) -> str:
+    """Escape a free-text ``q`` for SQLite LIKE.
+
+    SQLite LIKE treats ``%`` and ``_`` as wildcards; an operator who
+    searches for a literal underscore should not get an unintended
+    match. We escape both wildcards and wrap the value in ``%``.
+    Caller passes the result into a ``?`` parameter; SQLite binds
+    the value, so the escape characters are inert to SQL injection.
+    """
+    escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
 def _audit_row_to_dto(row: dict[str, Any], *, detailed: bool) -> AuditEventDTO:
     correlation = json.loads(row.get("correlation_json") or "{}")
     before_after = json.loads(row.get("before_after_json") or "{}")
@@ -1159,6 +1172,7 @@ class AuditQueries:
         object_id: str | None = None,
         seq_min: int | None = None,
         seq_max: int | None = None,
+        q: str | None = None,
     ) -> PagedResponse:
         snapshot_id, _ = _read_head_snapshot(self.vault)
         decoded = decode_cursor(cursor, scope="audit")
@@ -1189,6 +1203,24 @@ class AuditQueries:
         if seq_max is not None:
             where.append("seq <= ?")
             params.append(int(seq_max))
+        # Free-text filter. SQLite LIKE is case-insensitive for ASCII
+        # by default; the operator passes through unchanged. We match
+        # against the three readable columns (``action``,
+        # ``object_id``, ``details_json``) — the trace / evidence /
+        # correlation text never lives in the audit row's details_json
+        # alone (full text is in the artifact); see \`list_query_traces\`
+        # below for query-text search. ``ESCAPE '\\'`` makes the
+        # wildcard-escape in ``_like_pattern`` actually take effect;
+        # without it, SQLite would treat ``\\_`` as the literal chars
+        # ``\`` + ``_``.
+        if q:
+            q_like = _like_pattern(q)
+            where.append(
+                "(action LIKE ? ESCAPE '\\' OR "
+                "object_id LIKE ? ESCAPE '\\' OR "
+                "details_json LIKE ? ESCAPE '\\')"
+            )
+            params.extend([q_like, q_like, q_like])
         if last_seq:
             where.append("seq < ?")
             params.append(last_seq)
@@ -1213,6 +1245,7 @@ class AuditQueries:
                     "object_id": object_id,
                     "seq_min": seq_min,
                     "seq_max": seq_max,
+                    "q": q,
                 },
             )
         return PagedResponse(
@@ -1245,6 +1278,7 @@ class AuditQueries:
         conn,
         cursor: str | None,
         page_size: int = 25,
+        q: str | None = None,
     ) -> PagedResponse:
         snapshot_id, _ = _read_head_snapshot(self.vault)
         decoded = decode_cursor(cursor, scope="query_traces")
@@ -1263,12 +1297,42 @@ class AuditQueries:
         if last_seq:
             where.append("seq < ?")
             params.append(last_seq)
+        # Free-text filter. The actual query text lives in the
+        # persisted trace artifact (``<vault>/artifacts/queries/<trace_id>.json``),
+        # so SQL LIKE on ``object_id`` (the trace_id) alone is not
+        # enough. We over-fetch when ``q`` is set and post-filter by
+        # reading the artifact files; the cost is bounded because
+        # traces are operator-pinned (small per-call cardinality).
+        over_fetch = page_size * 4 + 1 if q else page_size + 1
         sql = (
             "SELECT * FROM audit_events WHERE " + " AND ".join(where) +
             " ORDER BY seq DESC LIMIT ?"
         )
-        params.append(page_size + 1)
+        params.append(over_fetch)
         rows = [_row_to_dict(r) for r in conn.execute(sql, params).fetchall()]
+        if q:
+            q_lower = q.lower()
+            kept: list[dict[str, Any]] = []
+            for r in rows:
+                if q_lower in str(r.get("object_id") or "").lower():
+                    kept.append(r)
+                    continue
+                # Read the artifact; if the query text matches, keep.
+                artifact = (
+                    self.vault.artifacts_dir / "queries" / f"{r['object_id']}.json"
+                )
+                if artifact.exists():
+                    try:
+                        import json as _json
+                        haystack = _json.dumps(
+                            _json.loads(artifact.read_text(encoding="utf-8")),
+                            ensure_ascii=False,
+                        ).lower()
+                    except (ValueError, OSError):
+                        haystack = ""
+                    if q_lower in haystack:
+                        kept.append(r)
+            rows = kept
         has_more = len(rows) > page_size
         rows = rows[:page_size]
         items: list[QueryTraceDTO] = []
@@ -1279,7 +1343,7 @@ class AuditQueries:
             next_cursor = encode_cursor(
                 scope="query_traces",
                 snapshot_id=snapshot_id,
-                params={"last_seq": int(rows[-1]["seq"])},
+                params={"last_seq": int(rows[-1]["seq"]), "q": q},
             )
         return PagedResponse(
             header=_build_header(conn, self.vault),
@@ -1417,12 +1481,14 @@ def list_summaries_for_route(
             object_id=args.get("object_id"),
             seq_min=(int(args["seq_min"]) if args.get("seq_min") is not None else None),
             seq_max=(int(args["seq_max"]) if args.get("seq_max") is not None else None),
+            q=args.get("q"),
         )
     if method == "query_traces":
         return svc.list_query_traces(
             conn=conn,
             cursor=args.get("cursor"),
             page_size=int(args.get("page_size") or 25),
+            q=args.get("q"),
         )
     raise ValueError(f"unknown list method {method!r}")
 

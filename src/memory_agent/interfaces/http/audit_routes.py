@@ -293,6 +293,7 @@ def list_audit_events(
     object_id: str | None = Query(default=None),
     seq_min: int | None = Query(default=None),
     seq_max: int | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=200),
     svc: AuditQueries = Depends(_audit_service),
     conn=Depends(_open_conn),
 ) -> dict[str, Any]:
@@ -303,6 +304,7 @@ def list_audit_events(
             "cursor": cursor, "page_size": page_size,
             "action": action, "object_type": object_type,
             "object_id": object_id, "seq_min": seq_min, "seq_max": seq_max,
+            "q": q,
         },
     )
     return body.model_dump(mode="json")
@@ -331,13 +333,14 @@ def list_query_traces(
     request: Request,
     cursor: str | None = Query(default=None),
     page_size: int = Query(default=25, ge=1, le=200),
+    q: str | None = Query(default=None, max_length=200),
     svc: AuditQueries = Depends(_audit_service),
     conn=Depends(_open_conn),
 ) -> dict[str, Any]:
     cursor = _validate_cursor(cursor, "query_traces")
     body = list_summaries_for_route(
         svc, conn=conn, method="query_traces",
-        args={"cursor": cursor, "page_size": page_size},
+        args={"cursor": cursor, "page_size": page_size, "q": q},
     )
     return body.model_dump(mode="json")
 
