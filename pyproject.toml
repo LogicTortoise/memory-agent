@@ -18,15 +18,17 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Operating System :: POSIX :: MacOS",
 ]
-homepage = "https://github.com/LogicTortoise/memory-agent"
-repository = "https://github.com/LogicTortoise/memory-agent"
-issues = "https://github.com/LogicTortoise/memory-agent/issues"
 dependencies = [
     "pydantic>=2.6,<3",
     "PyYAML>=6.0,<7",
     "fastapi>=0.110,<0.140",
     "uvicorn>=0.27,<0.40",
 ]
+
+[project.urls]
+homepage = "https://github.com/LogicTortoise/memory-agent"
+repository = "https://github.com/LogicTortoise/memory-agent"
+issues = "https://github.com/LogicTortoise/memory-agent/issues"
 
 [project.optional-dependencies]
 dev = [
