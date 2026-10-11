@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   Banner,
@@ -11,7 +11,7 @@ import {
 } from "../components/primitives";
 import { Card } from "../components/Card";
 import { CardCarousel } from "../components/CardCarousel";
-import { useAuditEvents, useClient } from "../hooks/queries";
+import { useAuditEvents, useClient, useJobs } from "../hooks/queries";
 import { useDetail } from "../components/DetailContext";
 import { HttpError } from "../api/client";
 import type { AuditEventDTO, CommandResponse } from "../api/contracts";
@@ -29,6 +29,22 @@ function toneForOutcome(outcome: string): "ok" | "pending" | "error" | "muted" {
   }
 }
 
+function toneForJobState(state: string): "ok" | "pending" | "error" | "info" | "muted" {
+  switch (state) {
+    case "succeeded":
+      return "ok";
+    case "running":
+      return "info";
+    case "queued":
+      return "pending";
+    case "failed":
+    case "cancelled":
+      return "error";
+    default:
+      return "muted";
+  }
+}
+
 export function AuditPage() {
   const [actionFilter, setActionFilter] = useState("");
   const [search, setSearch] = useState("");
@@ -37,11 +53,37 @@ export function AuditPage() {
     action: actionFilter || null,
     q: search.trim() || null,
   });
+  const jobs = useJobs({ page_size: 50 });
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobState, setJobState] = useState<CommandResponse | null>(null);
   const [jobError, setJobError] = useState<Error | null>(null);
   const client = useClient();
   const detail = useDetail();
+
+  // Wire cancel / retry buttons to POST /commands. The dispatcher
+  // applies the same version-checked cancel / retry semantics as
+  // the CLI; the UI just needs to pass job_id + expected_revision.
+  const runJobAction = useCallback(
+    async (
+      target_job_id: string,
+      expected_revision: number,
+      operation: "job.cancel" | "job.retry",
+    ) => {
+      try {
+        await client.postCommand({
+          operation,
+          mode: "sync",
+          client_id: "audit-ui",
+          params: { job_id: target_job_id, expected_revision },
+        });
+        // No state update: the polling list endpoint will surface the
+        // new state on its next tick (useJobs default interval).
+      } catch (err) {
+        setJobError(err instanceof Error ? err : new Error(String(err)));
+      }
+    },
+    [client],
+  );
 
   // Light polling on job state when the operator has asked.
   useEffect(() => {
@@ -139,6 +181,69 @@ export function AuditPage() {
               </div>
               <div style={{ marginTop: 6 }}>
                 <StatusPill tone={toneForOutcome(ev.outcome)}>{ev.outcome}</StatusPill>
+              </div>
+            </Card>
+          ))}
+        </CardCarousel>
+      )}
+      {jobs.data && jobs.data.items.length > 0 && (
+        <CardCarousel
+          title="异步作业"
+          count={jobs.data.items.length}
+          data-testid="jobs-carousel"
+        >
+          {jobs.data.items.map((j) => (
+            <Card
+              key={j.job_id}
+              variant="swipe"
+              data-testid={`job-row-${j.job_id}`}
+              aria-label={`${j.operation} (${j.state})`}
+              onClick={() => {
+                setJobId(j.job_id);
+              }}
+            >
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <StatusPill tone={toneForJobState(j.state)}>{j.state}</StatusPill>
+                <span className="muted" style={{ fontSize: 11 }}>{j.mode}</span>
+                {j.cancel_requested && (
+                  <StatusPill tone="pending">cancel?</StatusPill>
+                )}
+              </div>
+              <div className="mono" style={{ marginTop: 6, fontSize: 12 }}>
+                {j.operation}
+              </div>
+              <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+                rev {j.revision} · {formatTimestamp(j.created_at)}
+              </div>
+              <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
+                <button
+                  type="button"
+                  data-testid={`job-cancel-${j.job_id}`}
+                  disabled={
+                    j.state === "succeeded" ||
+                    j.state === "failed" ||
+                    j.state === "cancelled" ||
+                    j.cancel_requested
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void runJobAction(j.job_id, j.revision, "job.cancel");
+                  }}
+                >
+                  取消
+                </button>
+                {(j.state === "failed" || j.state === "cancelled") && (
+                  <button
+                    type="button"
+                    data-testid={`job-retry-${j.job_id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void runJobAction(j.job_id, j.revision, "job.retry");
+                    }}
+                  >
+                    重试
+                  </button>
+                )}
               </div>
             </Card>
           ))}

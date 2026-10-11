@@ -11,6 +11,7 @@ import type {
   BatchDetailDTO,
   BatchEvidenceDTO,
   ConflictDTO,
+  JobListItemDTO,
   MemoryHistoryDTO,
   MemoryListItemDTO,
   OverviewDTO,
@@ -171,6 +172,26 @@ export function useMemories(args: {
     ],
   );
   return usePolling<PagedResponse<MemoryListItemDTO>>(fetcher);
+}
+
+export function useJobs(args: {
+  cursor?: string | null;
+  page_size?: number;
+  state?: string | null;
+  q?: string | null;
+}) {
+  const client = useClient();
+  const fetcher = useMemo(
+    () => () => client.listJobs(args),
+    [
+      client,
+      args.cursor ?? null,
+      args.page_size ?? 25,
+      args.state ?? null,
+      args.q ?? null,
+    ],
+  );
+  return usePolling<PagedResponse<JobListItemDTO>>(fetcher);
 }
 
 export function useAuditEvents(args: {

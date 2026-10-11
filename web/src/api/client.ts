@@ -23,9 +23,11 @@ import type {
   CommandResponse,
   ConflictDTO,
   EnvelopeHeader,
+  JobListItemDTO,
   ListAuditArgs,
   ListBatchesArgs,
   ListConflictsArgs,
+  ListJobsArgs,
   ListMemoriesArgs,
   ListQueryTracesArgs,
   ListSessionTurnsArgs,
@@ -180,6 +182,15 @@ export class MemoryAgentClient {
     if (args.include_archived) qs.set("include_archived", "true");
     if (args.q) qs.set("q", args.q);
     return this.getJson<PagedResponse<MemoryListItemDTO>>(`/api/v1/memories?${qs}`);
+  }
+
+  listJobs(args: ListJobsArgs = {}): Promise<PagedResponse<JobListItemDTO>> {
+    const qs = new URLSearchParams();
+    if (args.cursor) qs.set("cursor", args.cursor);
+    if (args.page_size) qs.set("page_size", String(args.page_size));
+    if (args.state) qs.set("state", args.state);
+    if (args.q) qs.set("q", args.q);
+    return this.getJson<PagedResponse<JobListItemDTO>>(`/api/v1/jobs?${qs}`);
   }
 
   listAuditEvents(args: ListAuditArgs = {}): Promise<PagedResponse<AuditEventDTO>> {

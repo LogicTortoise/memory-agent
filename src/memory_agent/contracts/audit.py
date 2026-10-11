@@ -329,6 +329,30 @@ class MemoryListItemDTO(BaseModel):
     scope_level: str | None
 
 
+class JobListItemDTO(BaseModel):
+    """Metadata-only summary for the /jobs list view.
+
+    Excludes progress / result / error bodies (those grow with
+    each batch and would balloon the list response). The
+    operator-facing UI can still poll ``GET /api/v1/jobs/{id}``
+    for the full job state.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    request_id: str
+    client_id: str
+    operation: str
+    state: str
+    revision: int
+    mode: str
+    cancel_requested: bool
+    created_at: str | None
+    started_at: str | None
+    ended_at: str | None
+    last_heartbeat: str | None
+
+
 class MemoryHistoryDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

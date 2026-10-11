@@ -511,6 +511,98 @@ def test_memories_list_include_archived_excludes_by_default(http_client) -> None
     )
 
 
+def _seed_job_row(
+    *, app_obj, job_id: str, operation: str, state: str,
+    cancel_requested: bool = False,
+) -> None:
+    """Insert a single ``jobs`` row directly.
+
+    The ``http_client`` fixture seeds the audit log but never queues
+    async jobs, so list-end tests need to mint their own rows to
+    exercise ``GET /api/v1/jobs``.
+    """
+    conn = open_state_db(app_obj.vault.state_db)
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO jobs("
+            "job_id, request_id, client_id, idempotency_key, "
+            "request_hash, operation, params_ref, state, "
+            "cancel_requested, mode, created_at, revision"
+            ") VALUES (?, ?, 'audit-ui-test', NULL, ?, ?, NULL, ?, ?, 'sync', ?, 1)",
+            (
+                job_id, f"req_{job_id}", f"hash_{job_id}",
+                operation, state, int(cancel_requested),
+                "2026-10-11T00:00:00+00:00",
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def test_jobs_list_returns_seeded_rows(http_client) -> None:
+    """``GET /api/v1/jobs`` surfaces queued / running / failed rows
+    so the operator no longer has to drop to the CLI for ``memory
+    job status``."""
+    client, app_obj = http_client
+    _seed_job_row(
+        app_obj=app_obj, job_id="job_test_queued",
+        operation="scan", state="queued",
+    )
+    _seed_job_row(
+        app_obj=app_obj, job_id="job_test_running",
+        operation="maintain", state="running",
+    )
+    _seed_job_row(
+        app_obj=app_obj, job_id="job_test_failed",
+        operation="batch.process", state="failed",
+    )
+
+    response = client.get("/api/v1/jobs?page_size=50")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    ids = {it["job_id"] for it in body["items"]}
+    assert {"job_test_queued", "job_test_running", "job_test_failed"} <= ids
+    for it in body["items"]:
+        assert {"job_id", "request_id", "client_id", "operation", "state",
+                "revision", "mode", "cancel_requested",
+                "created_at", "started_at", "ended_at",
+                "last_heartbeat"} <= set(it.keys())
+
+
+def test_jobs_list_state_filter_narrows_results(http_client) -> None:
+    client, app_obj = http_client
+    _seed_job_row(app_obj=app_obj, job_id="job_q1", operation="scan", state="queued")
+    _seed_job_row(app_obj=app_obj, job_id="job_q2", operation="scan", state="queued")
+    _seed_job_row(app_obj=app_obj, job_id="job_r1", operation="scan", state="running")
+    queued = client.get("/api/v1/jobs?state=queued&page_size=50").json()
+    assert {it["job_id"] for it in queued["items"]} >= {"job_q1", "job_q2"}
+    assert all(it["state"] == "queued" for it in queued["items"])
+    running = client.get("/api/v1/jobs?state=running&page_size=50").json()
+    assert {it["job_id"] for it in running["items"]} >= {"job_r1"}
+    assert all(it["state"] == "running" for it in running["items"])
+
+
+def test_jobs_list_q_filter_matches_operation(http_client) -> None:
+    client, app_obj = http_client
+    _seed_job_row(
+        app_obj=app_obj, job_id="job_a",
+        operation="scan.backfill", state="queued",
+    )
+    _seed_job_row(
+        app_obj=app_obj, job_id="job_b",
+        operation="maintain", state="queued",
+    )
+
+    matched = client.get("/api/v1/jobs?q=backfill&page_size=50").json()
+    ids = {it["job_id"] for it in matched["items"]}
+    assert "job_a" in ids
+    assert "job_b" not in ids
+    # q="%" is escaped to a literal; no row contains "%".
+    pct = client.get("/api/v1/jobs?q=%25&page_size=50").json()
+    assert pct["items"] == []
+
+
 def test_audit_list_redacts_details(http_client) -> None:
     client, _ = http_client
     response = client.get("/api/v1/audit?page_size=25")

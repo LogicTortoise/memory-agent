@@ -283,6 +283,43 @@ def list_conflicts(
 # ---------------------------------------------------------------------------
 
 
+@router.get("/jobs")
+def list_jobs(
+    request: Request,
+    cursor: str | None = Query(default=None),
+    page_size: int = Query(default=25, ge=1, le=200),
+    state: str | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=200),
+    svc: AuditQueries = Depends(_audit_service),
+    conn=Depends(_open_conn),
+) -> dict[str, Any]:
+    """List async jobs (metadata-only).
+
+    The list view closes the gap left by v1 P6 / T14: ``GET
+    /api/v1/jobs/{id}`` already served the single-job read, but
+    no endpoint surfaced the queue. Operators had to drop to the
+    CLI for ``memory job status``. State filter and ``q`` are
+    optional; ``q`` LIKE-matches operation + client_id +
+    request_id + the JSON progress / result / error blobs with
+    SQLite wildcards escaped.
+
+    Write side (cancel / retry) is unchanged — every state
+    mutation still goes through ``POST /api/v1/commands`` with
+    ``operation="job.cancel"`` / ``job.retry"`` so the
+    dispatcher applies the same version checks and idempotency
+    rules as the CLI.
+    """
+    cursor = _validate_cursor(cursor, "jobs")
+    body = list_summaries_for_route(
+        svc, conn=conn, method="jobs",
+        args={
+            "cursor": cursor, "page_size": page_size,
+            "state": state, "q": q,
+        },
+    )
+    return body.model_dump(mode="json")
+
+
 @router.get("/memories")
 def list_memories(
     request: Request,

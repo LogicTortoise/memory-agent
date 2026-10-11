@@ -1084,6 +1084,106 @@ class AuditQueries:
             return default
 
     # -----------------------------------------------------------------
+    # jobs (read-only list — write side goes through POST /commands)
+    # -----------------------------------------------------------------
+    def list_jobs(
+        self,
+        *,
+        conn,
+        cursor: str | None,
+        page_size: int = 25,
+        state: str | None = None,
+        q: str | None = None,
+    ) -> PagedResponse:
+        """Metadata-only list of the ``jobs`` table.
+
+        v1 P6 / T14 only exposes ``GET /api/v1/jobs/{id}`` for the
+        single-job read; the operator cannot see queued / running /
+        failed jobs without dropping to the CLI. This fills the
+        list-end gap so the audit UI can show a "jobs" carousel.
+
+        Write side (cancel / retry) is unchanged — every state
+        mutation still goes through ``POST /api/v1/commands`` so
+        the dispatcher applies the same version checks and
+        idempotency rules as the CLI.
+        """
+        from memory_agent.contracts.audit import JobListItemDTO
+
+        page_size = max(1, min(200, int(page_size)))
+        decoded = decode_cursor(cursor, scope="jobs")
+        last_job_id = ""
+        if decoded:
+            last_job_id = str(decoded["params"].get("last_job_id") or "")
+
+        params: list[Any] = []
+        where: list[str] = []
+        if state:
+            where.append("state = ?")
+            params.append(state)
+        if q:
+            # Match against operation + client_id + request_id + the
+            # JSON-stringified progress / result / error blobs.
+            q_like = _like_pattern(q)
+            where.append(
+                "(operation LIKE ? ESCAPE '\\' OR "
+                "client_id LIKE ? ESCAPE '\\' OR "
+                "request_id LIKE ? ESCAPE '\\' OR "
+                "COALESCE(progress_json, '') LIKE ? ESCAPE '\\' OR "
+                "COALESCE(result_json, '') LIKE ? ESCAPE '\\' OR "
+                "COALESCE(error_json, '') LIKE ? ESCAPE '\\')"
+            )
+            params.extend([q_like] * 6)
+        if last_job_id:
+            where.append("job_id < ?")
+            params.append(last_job_id)
+        sql = "SELECT * FROM jobs"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY created_at DESC, job_id DESC LIMIT ?"
+        params.append(page_size + 1)
+        rows = conn.execute(sql, params).fetchall()
+        has_more = len(rows) > page_size
+        rows = rows[:page_size]
+        items: list[dict[str, Any]] = []
+        for r in rows:
+            row = _row_to_dict(r)
+            items.append(JobListItemDTO(
+                job_id=str(row["job_id"]),
+                request_id=str(row.get("request_id") or ""),
+                client_id=str(row.get("client_id") or ""),
+                operation=str(row.get("operation") or ""),
+                state=str(row.get("state") or ""),
+                revision=int(row.get("revision") or 0),
+                mode=str(row.get("mode") or "sync"),
+                cancel_requested=bool(int(row.get("cancel_requested") or 0)),
+                created_at=row.get("created_at"),
+                started_at=row.get("started_at"),
+                ended_at=row.get("ended_at"),
+                last_heartbeat=row.get("last_heartbeat"),
+            ).model_dump(mode="json"))
+        next_cursor = None
+        if has_more and rows:
+            last = rows[-1]
+            next_cursor = encode_cursor(
+                scope="jobs",
+                snapshot_id=str(_read_head_snapshot(self.vault)[0]),
+                params={
+                    "last_job_id": str(last["job_id"]),
+                    "state": state,
+                    "q": q,
+                },
+            )
+        return PagedResponse(
+            header=_build_header(conn, self.vault),
+            items=items,
+            pagination=PaginationCursor(
+                cursor=cursor,
+                next_cursor=next_cursor,
+                page_size=page_size,
+            ),
+        )
+
+    # -----------------------------------------------------------------
     # conflicts
     # -----------------------------------------------------------------
     def list_conflicts(
@@ -1569,6 +1669,14 @@ def list_summaries_for_route(
             cursor=args.get("cursor"),
             page_size=int(args.get("page_size") or 25),
             include_archived=bool(args.get("include_archived") or False),
+            q=args.get("q"),
+        )
+    if method == "jobs":
+        return svc.list_jobs(
+            conn=conn,
+            cursor=args.get("cursor"),
+            page_size=int(args.get("page_size") or 25),
+            state=args.get("state"),
             q=args.get("q"),
         )
     if method == "audit":

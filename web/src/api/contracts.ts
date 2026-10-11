@@ -175,6 +175,28 @@ export type ListMemoriesArgs = {
   q?: string | null;
 };
 
+export interface JobListItemDTO {
+  job_id: string;
+  request_id: string;
+  client_id: string;
+  operation: string;
+  state: string;
+  revision: number;
+  mode: string;
+  cancel_requested: boolean;
+  created_at: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  last_heartbeat: string | null;
+}
+
+export type ListJobsArgs = {
+  cursor?: string | null;
+  page_size?: number;
+  state?: string | null;
+  q?: string | null;
+};
+
 export interface MemoryHistoryDTO {
   header: EnvelopeHeader;
   memory_id: string;
