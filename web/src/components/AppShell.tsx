@@ -17,6 +17,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { useOverview } from "../hooks/queries";
 import { describeProjection } from "../api/client";
+import { DetailProvider } from "./DetailContext";
 
 const navItems: Array<{ to: string; label: string; monogram: string }> = [
   { to: "/", label: "处理概览", monogram: "概" },
@@ -62,6 +63,7 @@ export function AppShell() {
   const toggleSidebar = () =>
     setSidebar((s) => (s === "expanded" ? "collapsed" : "expanded"));
   return (
+    <DetailProvider>
     <div className={`app-shell${sidebar === "collapsed" ? " app-shell--collapsed" : ""}`}>
       <header className="app-header">
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -133,5 +135,6 @@ export function AppShell() {
         <Outlet />
       </main>
     </div>
+    </DetailProvider>
   );
 }
