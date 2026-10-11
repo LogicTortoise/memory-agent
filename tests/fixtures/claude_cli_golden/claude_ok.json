@@ -1,0 +1,30 @@
+{
+  "type": "result",
+  "is_error": false,
+  "model": "claude-3.5-sonnet",
+  "duration_ms": 1823,
+  "result": {
+    "candidates": [
+      {
+        "candidate_id": "cand_demo_001",
+        "kind": "requirement",
+        "abstraction": "no_opinion",
+        "statement": "use Python for the prototype always",
+        "modality": "always",
+        "scope": {"level": "global"},
+        "tags": ["language-preference", "prototype"],
+        "evidence": [
+          {
+            "source_event_id": "evt_demo_u01",
+            "source_revision_hash": "rev_demo_0001",
+            "role": "user",
+            "origin": "user_session",
+            "quote": "use Python for the prototype always",
+            "span_start": 0,
+            "span_end": 35
+          }
+        ]
+      }
+    ]
+  }
+}

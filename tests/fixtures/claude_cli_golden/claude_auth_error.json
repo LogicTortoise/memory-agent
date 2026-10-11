@@ -1,0 +1,7 @@
+{
+  "type": "result",
+  "is_error": true,
+  "model": "claude-3.5-sonnet",
+  "duration_ms": 412,
+  "result": "OAuth authentication required. Set ANTHROPIC_API_KEY or run `claude login`."
+}
