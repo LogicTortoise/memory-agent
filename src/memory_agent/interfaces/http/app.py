@@ -50,7 +50,10 @@ from memory_agent.interfaces.http.local_auth import (
 from memory_agent import __version__
 
 
-DEFAULT_PORT = 8420
+# Default loopback UI port. 8440 is chosen to stay clear of the local
+# Octopus controller (which occupies 8420 on this machine); operators
+# can still override via `memory ui --port`. See docs/22-v1-p7-p8.
+DEFAULT_PORT = 8440
 
 
 @dataclass

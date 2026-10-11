@@ -9,7 +9,11 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 8_000 },
   use: {
-    baseURL: "http://127.0.0.1:8420",
+    // Default port is 8440 (clear of the local Octopus service on
+    // 8420). Operators running the UI on a different port can override
+    // via MEMORY_AGENT_PLAYWRIGHT_BASE_URL or by passing
+    // --baseURL to `npx playwright test`. See docs/22-v1-p7-p8.
+    baseURL: "http://127.0.0.1:8440",
     trace: "off",
     screenshot: "only-on-failure",
     video: "off",

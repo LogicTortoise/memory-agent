@@ -101,7 +101,8 @@ To launch the UI against a real vault:
 cd /Users/Hht/Documents/10.github/memory-agent
 python3 -m memory_agent --vault /tmp/my_vault ui \
   --session-token "dev-token" --ui-dist "$(pwd)/web/dist"
-# → http://127.0.0.1:8420/
+# → http://127.0.0.1:8440/   (default — clear of Octopus on 8420;
+#   override with `--port`.)
 ```
 
 ## Not claimed

@@ -55,7 +55,11 @@ class LocalAuthConfig:
 
     allowed_origins: list[str] = field(default_factory=list)
     session_token: str | None = None
-    bind_port: int = 8420
+    # Default port for the loopback audit UI HTTP service. 8440 is chosen
+    # to stay clear of the local Octopus controller (which occupies 8420
+    # on this machine); the operator can still override with
+    # ``--ui-port`` / ``memory ui --port``. See docs/22-v1-p7-p8.
+    bind_port: int = 8440
     write_methods_enabled: bool = True
 
     def origin_allowed(self, origin: str | None) -> bool:
@@ -71,7 +75,7 @@ def load_auth_config(
     *,
     config: dict[str, object] | None = None,
     env_token: str | None = None,
-    port: int = 8420,
+    port: int = 8440,
 ) -> LocalAuthConfig:
     """Build a :class:`LocalAuthConfig` from ``config.toml`` + env.
 

@@ -160,8 +160,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ui_p.add_argument("--host", default="127.0.0.1",
                        help="bind host (MUST be 127.0.0.1 / localhost / ::1)")
-    ui_p.add_argument("--port", type=int, default=8420,
-                       help="loopback port (default 8420)")
+    ui_p.add_argument("--port", type=int, default=8440,
+                       help="loopback port (default 8440 — clear of Octopus on 8420)")
     ui_p.add_argument("--ui-dist", default=None,
                        help="path to the built static UI directory (default: <repo>/web/dist)")
     ui_p.add_argument("--session-token", default=None,

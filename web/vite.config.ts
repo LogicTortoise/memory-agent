@@ -25,7 +25,11 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8420",
+        // Default port is 8440 (clear of the local Octopus service on
+        // 8420). Operators on a different port can override via the
+        // MEMORY_AGENT_UI_PORT env var consumed by `scripts/run.sh`
+        // — see docs/22-v1-p7-p8.
+        target: "http://127.0.0.1:8440",
         changeOrigin: false,
       },
     },
