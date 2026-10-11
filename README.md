@@ -11,10 +11,30 @@
 > | Phase C + repair-2 | T10 async `call` + jobs + project-owned worker with leases / schedules, T11 OS service-manager template, source-correction reconciliation queue with `adopt_new` / `scope_split`, inline discovery in `scan`, real opt-in Claude rewrite provider, `review` no longer `UNSUPPORTED` | [`docs/19`](docs/19-v1-phase-c-acceptance.md) |
 > | P4 / T12 | Project-owned Telegram Bot API adapter — durable update offset + dedupe, short-lived callback tokens bound to proposal + revision + action, allowed chat / user validation, durable outbox + decision ack, decisions through the same `decide` application service as the CLI, bot echo ignored, no Telegram configured ⇒ CLI fallback and zero network calls; fake-server acceptance only, no real token read or message sent | [`docs/20`](docs/20-v1-p4-acceptance.md) |
 > | P5 / T13 + P6 / T14 | Audit query service (metadata-first DTOs, server-side cursors, redacted list views, end-to-end trace `source → batch → model call → candidate → commit`) + loopback FastAPI (127.0.0.1 only, Origin + session-token checks, no wildcard CORS, shared application service) | [`docs/21`](docs/21-v1-p5-p6-acceptance.md) |
-> | P7 / T15 + P8 / T16 | React 18 + TypeScript + Vite audit UI; real FastAPI + fixture vault integration; 15 Vitest + 16 Playwright tests (navigation, evidence expansion, decision idempotency, stale-revision guard, dark theme, narrow viewport, keyboard nav) | [`docs/22-v1-p7-p8`](docs/22-v1-p7-p8-acceptance.md) |
+> | P7 / T15 + P8 / T16 | React 18 + TypeScript + Vite audit UI; collapsible left tab strip (default collapsed to monograms, chevron expands to full labels, state persisted to `localStorage["ma-sidebar"]`); inside each section, horizontal **card-swipe carousels** with scroll-snap + arrow-key nav; click a card → **shared `DetailPanel`** (slide-in from right on desktop, bottom sheet on narrow viewports, ESC/backdrop close, focus trap + restoration); real FastAPI + fixture vault integration; 15 Vitest + 16 Playwright tests (navigation, evidence expansion, decision idempotency, stale-revision guard, dark theme, narrow viewport, keyboard nav) | [`docs/22-v1-p7-p8`](docs/22-v1-p7-p8-acceptance.md) |
 > | P9 / T17 | Privacy deletion (durable manifest + atomic privacy HEAD, query-time double-read of the deletion version, source-level re-ingest guard); consistent SQLite + files backup via the stdlib `sqlite3.Connection.backup` API; doctor extension (schema, HEAD refs, source / cursor, intents, deletion manifest, recoverability); reproducible install / run / uninstall (uninstall never deletes the vault); **packaging of the React bundle** — `scripts/build_ui.sh` mirrors `web/dist/` into `src/memory_agent/ui/dist/`, `[tool.setuptools.package-data]` + `MANIFEST.in` ship it inside both the wheel and the sdist, `_resolve_default_ui_dist` falls back to `importlib.resources.files("memory_agent.ui").joinpath("dist")` so a clean `pip install` serves the real SPA, not the T14 placeholder | [`docs/22-v1-p9`](docs/22-v1-p9-acceptance.md) |
 
-A local, file-backed personal memory agent. It scans Claude Code and Codex session logs (with sanitised fixtures, never your real history unless you point it there), extracts explicit user requirements with a conservative reconciler, and serves them back through a keyword or BM25 recall command. **v0.1 is real, runnable, and self-contained** — no worker, no Telegram, no UI.
+A local, file-backed personal memory agent. It scans Claude Code and Codex session logs (with sanitised fixtures, never your real history unless you point it there), extracts explicit user requirements with a conservative reconciler, and serves them back through a keyword or BM25 recall command. **v0.1 is real, runnable, and self-contained** — no worker, no Telegram, no UI. v1 ships the audit UI on top.
+
+## UI design (v1 P7 / P8)
+
+The loopback audit UI is built for **operator control**, not for browsing:
+
+- **Collapsible tab strip** on the left. Default collapsed — only 6 monograms (`概` / `源` / `批` / `记` / `查` / `审`) showing. Click the chevron to expand to the full Chinese labels (220 px wide). State persists in `localStorage["ma-sidebar"]` and is applied **before** React mounts via an inline `<script>` in `web/index.html` so there is no flash of unstyled layout. Below 960 px the strip collapses to a horizontal row.
+- **Card-swipe inside each section**. Every page (`Sources`, `Batches`, `Memories`, `Queries`, `Audit`, plus the KPI rows on `Overview`) renders its items as a horizontal carousel: 12 px gap, scroll-snap on each card, arrow-key nav between cards, trackpad horizontal-swipe does not snap-stop on every card. A small muted subheader above each row carries an optional count chip.
+- **Shared `DetailPanel`**. Single instance mounted in `AppShell`. Any card click calls `useDetail().open(title, contentNode)`. The panel slides in from the right at ~480 px on desktop, from the bottom as a sheet on narrow viewports. ESC and backdrop click close it; focus is trapped inside while open and restored to the triggering card on close. `role="dialog"` + `aria-modal="true"` + `aria-labelledby` point at the panel title.
+- **Modern minimal styling**. Cool blue-grey palette already in `theme.css` (`--ma-canvas`, `--ma-surface`, `--ma-accent`); a single 12 px radius for swipe cards (`--ma-radius-card`), a 6 px radius for inner tiles (`--ma-radius`); tabular numerals scoped to metric spans; no all-caps eyebrow labels, no numbered markers, no gradient washes.
+
+Launch with:
+
+```bash
+python -m memory_agent --vault <vault> ui \
+  --session-token "dev-token" --ui-dist "$(pwd)/web/dist"
+# → http://127.0.0.1:8440/   (default — clear of Octopus on 8420;
+#   override with `--port`.)
+```
+
+`scripts/build_ui.sh` mirrors the Vite-built bundle into `src/memory_agent/ui/dist/` so a clean wheel install also serves the real SPA (P9 / T17 packaging).
 
 This repository implements [docs/14-v1-development-plan.md](docs/14-v1-development-plan.md) and was originally drafted as a design-only blueprint at `/Users/Hht/Documents/Default Project/memory-agent/`. The design docs (`docs/00`–`docs/13`) are preserved for context; **the implemented scope is `docs/14`, `docs/15`, `docs/16` (plan), `docs/17` (phase A acceptance), `docs/18` (phase B acceptance), `docs/19` (phase C acceptance), `docs/20` (P4), `docs/21` (P5/P6), and `docs/22` (P9)**. The blueprint path is a snapshot reference; this GitHub directory is the active development root and the only one that should receive edits, commits, or CI.
 
@@ -275,4 +295,4 @@ python3 -m pytest tests/ -q
 
 The project was originally drafted as a design-only blueprint at `/Users/Hht/Documents/Default Project/memory-agent/`. That blueprint was copied as the starting design into this GitHub directory (`/Users/Hht/Documents/10.github/memory-agent/`) and then implemented here. The blueprint path is a frozen snapshot reference; the GitHub directory is the active development root and the only one that should receive edits, commits, or CI. The two paths may diverge.
 
-**This local repository has no configured Git remote and no published GitHub repository.** `pyproject.toml` therefore declares no `Homepage` / `Source` / `Issues` URLs: those fields would advertise a repository that does not exist. Add them back when a remote actually exists.
+The active development repository lives at <https://github.com/LogicTortoise/memory-agent>. `pyproject.toml` advertises this `Homepage` / `Source` / `Issues` so install metadata points operators at the real one.
