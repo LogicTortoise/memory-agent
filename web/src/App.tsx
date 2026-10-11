@@ -27,15 +27,23 @@ export function App(props: AppProps) {
   return (
     <ClientProvider client={injected}>
       <BrowserRouter>
-        <AppShell />
         <Routes>
-          <Route path="/" element={<OverviewRoute />} />
-          <Route path="/sources" element={<SourcesPage />} />
-          <Route path="/batches" element={<BatchesPage />} />
-          <Route path="/memories" element={<MemoriesPage />} />
-          <Route path="/queries" element={<QueriesPage />} />
-          <Route path="/audit" element={<AuditPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/*
+            AppShell is the layout route for /; the page-level children
+            are rendered into its <Outlet /> (the .app-main region). The
+            previous flat structure had <AppShell /> as a sibling of
+            <Routes>, so <Outlet /> never resolved and pages rendered
+            below .app-shell in the document instead of inside main.
+          */}
+          <Route path="/" element={<AppShell />}>
+            <Route index element={<OverviewRoute />} />
+            <Route path="sources" element={<SourcesPage />} />
+            <Route path="batches" element={<BatchesPage />} />
+            <Route path="memories" element={<MemoriesPage />} />
+            <Route path="queries" element={<QueriesPage />} />
+            <Route path="audit" element={<AuditPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
         </Routes>
       </BrowserRouter>
     </ClientProvider>

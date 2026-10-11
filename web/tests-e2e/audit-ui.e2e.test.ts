@@ -19,7 +19,14 @@ test.describe.serial("P7/T15 audit UI", () => {
     const fx = await freshFixture();
     try {
       await bootAppWithFixture(page, fx);
-      await expect(page.getByRole("heading", { name: "处理概览" })).toBeVisible();
+      // P7 acceptance: page heading must render INSIDE .app-main, not
+      // bleed below the grid layout. The earlier routing bug put
+      // <AppShell /> as a sibling of <Routes />, so <Outlet /> never
+      // resolved and pages stacked under .app-shell in the document.
+      const heading = page.getByRole("heading", { name: "处理概览" });
+      await expect(heading).toBeVisible();
+      // DOM-position contract: the h1 must be a descendant of main.app-main.
+      await expect(page.locator(".app-main").getByRole("heading", { name: "处理概览" })).toBeVisible();
       await expect(page.getByTestId("stage-scanned")).toContainText(/\d/);
       await expect(page.getByTestId("stage-committed")).toContainText(/\d/);
       await expect(page.getByTestId("last-scan-at")).toContainText("最近扫描：");
