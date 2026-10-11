@@ -26,10 +26,12 @@ import type {
   ListAuditArgs,
   ListBatchesArgs,
   ListConflictsArgs,
+  ListMemoriesArgs,
   ListQueryTracesArgs,
   ListSessionTurnsArgs,
   ListSourcesArgs,
   MemoryHistoryDTO,
+  MemoryListItemDTO,
   OverviewDTO,
   PagedResponse,
   QueryTraceDTO,
@@ -169,6 +171,15 @@ export class MemoryAgentClient {
     if (args.page_size) qs.set("page_size", String(args.page_size));
     if (args.include_decided) qs.set("include_decided", "true");
     return this.getJson<PagedResponse<ConflictDTO>>(`/api/v1/conflicts?${qs}`);
+  }
+
+  listMemories(args: ListMemoriesArgs = {}): Promise<PagedResponse<MemoryListItemDTO>> {
+    const qs = new URLSearchParams();
+    if (args.cursor) qs.set("cursor", args.cursor);
+    if (args.page_size) qs.set("page_size", String(args.page_size));
+    if (args.include_archived) qs.set("include_archived", "true");
+    if (args.q) qs.set("q", args.q);
+    return this.getJson<PagedResponse<MemoryListItemDTO>>(`/api/v1/memories?${qs}`);
   }
 
   listAuditEvents(args: ListAuditArgs = {}): Promise<PagedResponse<AuditEventDTO>> {

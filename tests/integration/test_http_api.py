@@ -427,6 +427,90 @@ def test_memories_history_returns_revisions(http_client) -> None:
     assert body["revisions"]
 
 
+def test_memories_list_returns_active_rows(http_client) -> None:
+    """``GET /api/v1/memories`` returns the active memory_projection
+    rows as metadata-only list items."""
+    client, app_obj = http_client
+    response = client.get("/api/v1/memories?page_size=50")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    items = body["items"]
+    # The seeded fixture produced at least one active memory.
+    assert items, "expected at least one active memory"
+    for it in items:
+        assert {"memory_id", "revision", "status", "statement",
+                "scope_level", "commit_id", "recorded_at"} <= set(it.keys())
+        assert it["status"] == "active"
+
+
+def test_memories_list_q_filter_matches_statement(http_client) -> None:
+    """``q`` on /memories LIKE-matches the statement column."""
+    client, _ = http_client
+    # Find a memory whose statement contains a known token; we use
+    # ``"prototype"`` because the seeded user_lines all start with
+    # ``"use Python for the prototype"``.
+    base = client.get("/api/v1/memories?page_size=50").json()
+    assert base["items"]
+    needle = "prototype"
+    matched = client.get(
+        f"/api/v1/memories?page_size=50&q={needle}"
+    ).json()
+    assert matched["items"], "q='prototype' should match at least one row"
+    for it in matched["items"]:
+        assert needle.lower() in (it["statement"] or "").lower()
+    # A needle nothing contains yields zero rows.
+    empty = client.get(
+        "/api/v1/memories?q=zzzz_no_match_zzzz"
+    ).json()
+    assert empty["items"] == []
+
+
+def test_memories_list_include_archived_excludes_by_default(http_client) -> None:
+    """``include_archived=true`` surfaces archived rows; default
+    hides them. Without an archived row in the fixture, this still
+    proves the flag round-trips and the default hides them."""
+    client, app_obj = http_client
+    # Inject an archived row directly so the flag has something to
+    # surface. The ``memory_projection`` table does not have a
+    # ``statement`` column (the operator-facing text lives in the
+    # memory markdown on disk; v1 P5/T13 metadata-first design),
+    # so we only insert the columns the schema actually carries.
+    conn = open_state_db(app_obj.vault.state_db)
+    try:
+        existing = conn.execute(
+            "SELECT memory_id, commit_id FROM memory_projection LIMIT 1"
+        ).fetchone()
+        if existing is None:
+            pytest.skip("no active memory to clone as archived")
+        m_id = "mem_archived_" + str(existing["memory_id"])[:8]
+        conn.execute(
+            "INSERT OR REPLACE INTO memory_projection("
+            "memory_id, revision, status, scope_json, "
+            "project_ids_json, domains_json, commit_id, recorded_at"
+            ") VALUES (?, ?, 'archived', '{}', '[]', '[]', ?, ?)",
+            (
+                m_id, 99,
+                existing["commit_id"],
+                "2026-01-01T00:00:00+00:00",
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    default = client.get("/api/v1/memories?page_size=50").json()
+    assert all(it["status"] == "active" for it in default["items"]), (
+        "default response must exclude archived rows"
+    )
+    with_archived = client.get(
+        "/api/v1/memories?page_size=50&include_archived=true"
+    ).json()
+    statuses = {it["status"] for it in with_archived["items"]}
+    assert "archived" in statuses, (
+        "include_archived=true must surface the archived row"
+    )
+
+
 def test_audit_list_redacts_details(http_client) -> None:
     client, _ = http_client
     response = client.get("/api/v1/audit?page_size=25")

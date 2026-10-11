@@ -309,6 +309,26 @@ class MemoryRevisionDTO(BaseModel):
     superseded_by_revision: int | None = None
 
 
+class MemoryListItemDTO(BaseModel):
+    """Metadata-only summary for the /memories list view.
+
+    Lighter than ``MemoryRevisionDTO`` — no evidence quotes, no
+    superseded_by_revision chain, no nested project / domain ids
+    beyond the scope level. The list endpoint surfaces this; the
+    detail endpoint /memories/{id}/history still returns the
+    full revision chain via ``MemoryHistoryDTO``.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    memory_id: str
+    revision: int
+    status: str
+    commit_id: str | None
+    recorded_at: str | None
+    statement: str
+    scope_level: str | None
+
+
 class MemoryHistoryDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

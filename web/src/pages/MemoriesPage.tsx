@@ -14,6 +14,7 @@ import { useDetail } from "../components/DetailContext";
 import {
   useClient,
   useConflicts,
+  useMemories,
   useMemoryHistory,
 } from "../hooks/queries";
 import {
@@ -40,6 +41,12 @@ function toneForConflictStatus(status: string): "pending" | "ok" | "muted" | "er
 
 export function MemoriesPage() {
   const conflicts = useConflicts({ page_size: 50 });
+  const [memSearch, setMemSearch] = useState("");
+  const memories = useMemories({
+    page_size: 50,
+    include_archived: false,
+    q: memSearch.trim() || null,
+  });
   const detail = useDetail();
   const [selectedConflictId, setSelectedConflictId] = useState<string | null>(null);
   useEffect(() => {
@@ -54,9 +61,63 @@ export function MemoriesPage() {
         title="记忆与决定"
         subtitle="活跃记忆、版本链、待决冲突"
         right={
-          <span className="muted">共 {conflicts.data?.items.length ?? 0} 条</span>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              type="search"
+              aria-label="Memory search"
+              placeholder="搜索 statement…"
+              value={memSearch}
+              onChange={(e) => setMemSearch(e.target.value)}
+              data-testid="memories-search-input"
+              style={{ minWidth: 200 }}
+            />
+            <span className="muted">
+              {memories.data?.items.length ?? 0} 条记忆 ·{" "}
+              {conflicts.data?.items.length ?? 0} 条冲突
+            </span>
+          </div>
         }
       />
+      {memories.data && memories.data.items.length > 0 && (
+        <CardCarousel
+          title="活跃记忆"
+          count={memories.data.items.length}
+          data-testid="memories-list-carousel"
+        >
+          {memories.data.items.map((m) => (
+            <Card
+              key={m.memory_id}
+              variant="swipe"
+              data-testid={`memory-row-${m.memory_id}`}
+              aria-label={`${m.memory_id}: ${m.statement}`}
+              onClick={() =>
+                detail.open({
+                  title: m.memory_id,
+                  content: <MemoryDetailPanel memoryId={m.memory_id} />,
+                })
+              }
+            >
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <StatusPill tone="info">rev {m.revision}</StatusPill>
+                <span className="muted" style={{ fontSize: 11 }}>
+                  {m.scope_level ?? "scope?"}
+                </span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 13 }}>
+                {m.statement || <span className="muted">（空 statement）</span>}
+              </div>
+              <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
+                {formatTimestamp(m.recorded_at)}
+              </div>
+            </Card>
+          ))}
+        </CardCarousel>
+      )}
+      {memories.data && memories.data.items.length === 0 && !memSearch.trim() && (
+        <Banner tone="ok" title="还没有活跃记忆">
+          调用 <code>memory maintain</code> 后这里会出现 committed memories。
+        </Banner>
+      )}
       {conflicts.error && <ErrorState error={conflicts.error} />}
       {!conflicts.data && !conflicts.error && (
         <EmptyState title="Loading…" hint="查询冲突列表" />
@@ -270,6 +331,43 @@ function RevisionColumn({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function MemoryDetailPanel({ memoryId }: { memoryId: string }) {
+  const history = useMemoryHistory(memoryId);
+  if (history.error) return <ErrorState error={history.error} />;
+  if (!history.data) return <EmptyState title="Loading…" />;
+  const revs = history.data.revisions;
+  return (
+    <div data-testid="memory-history">
+      <div className="muted" style={{ fontSize: 12 }}>memory_id</div>
+      <div className="mono" style={{ wordBreak: "break-all" }}>{memoryId}</div>
+      <h3 style={{ fontSize: 14, margin: "12px 0 8px" }}>
+        {revs.length} 个修订版本
+      </h3>
+      <ol style={{ paddingLeft: 18, margin: 0 }}>
+        {revs.map((r) => (
+          <li key={r.revision} style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+              <strong>rev {r.revision}</strong>
+              <StatusPill tone="info">{r.status}</StatusPill>
+              <span className="muted" style={{ fontSize: 11 }}>
+                {formatTimestamp(r.recorded_at)}
+              </span>
+            </div>
+            <div className="mono-block" style={{ marginTop: 4 }}>
+              {r.statement}
+            </div>
+            {r.evidence_quotes.length > 0 && (
+              <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+                evidence: {r.evidence_quotes.length} quote(s)
+              </div>
+            )}
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

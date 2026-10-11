@@ -279,6 +279,40 @@ def list_conflicts(
 
 
 # ---------------------------------------------------------------------------
+# /api/v1/memories  (list view — read-only metadata)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/memories")
+def list_memories(
+    request: Request,
+    cursor: str | None = Query(default=None),
+    page_size: int = Query(default=25, ge=1, le=200),
+    include_archived: bool = Query(default=False),
+    q: str | None = Query(default=None, max_length=200),
+    svc: AuditQueries = Depends(_audit_service),
+    conn=Depends(_open_conn),
+) -> dict[str, Any]:
+    """List committed memories (metadata-only).
+
+    v1 P5 / T13 ships this so the operator can browse the full
+    committed corpus, not just the conflict list. The default
+    excludes ``status='archived'`` rows; pass ``include_archived=true``
+    to surface them. ``q`` matches the ``statement`` (the operator-
+    facing memory text) with SQLite wildcards escaped.
+    """
+    cursor = _validate_cursor(cursor, "memories")
+    body = list_summaries_for_route(
+        svc, conn=conn, method="memories",
+        args={
+            "cursor": cursor, "page_size": page_size,
+            "include_archived": include_archived, "q": q,
+        },
+    )
+    return body.model_dump(mode="json")
+
+
+# ---------------------------------------------------------------------------
 # /api/v1/audit
 # ---------------------------------------------------------------------------
 

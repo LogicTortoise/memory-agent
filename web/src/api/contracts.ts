@@ -158,6 +158,23 @@ export interface MemoryRevisionDTO {
   superseded_by_revision: number | null;
 }
 
+export interface MemoryListItemDTO {
+  memory_id: string;
+  revision: number;
+  status: string;
+  commit_id: string | null;
+  recorded_at: string | null;
+  statement: string;
+  scope_level: string | null;
+}
+
+export type ListMemoriesArgs = {
+  cursor?: string | null;
+  page_size?: number;
+  include_archived?: boolean;
+  q?: string | null;
+};
+
 export interface MemoryHistoryDTO {
   header: EnvelopeHeader;
   memory_id: string;

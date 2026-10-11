@@ -1159,6 +1159,98 @@ class AuditQueries:
         return str(path) if path.exists() else None
 
     # -----------------------------------------------------------------
+    # memories (active + optionally archived)
+    # -----------------------------------------------------------------
+    def list_memories(
+        self,
+        *,
+        conn,
+        cursor: str | None,
+        page_size: int = 25,
+        include_archived: bool = False,
+        q: str | None = None,
+    ) -> PagedResponse:
+        """Metadata-first list of ``memory_projection`` rows.
+
+        v1 P5 / T13 ships this surface so the operator can browse the
+        full committed corpus, not just the conflicts surfacing under
+        ``/memories/{id}/history``. The list view is metadata-only:
+        no evidence quotes, no nested project / domain ids beyond the
+        scope level. ``q`` matches ``statement`` (the operator-facing
+        text of the memory); ``%`` and ``_`` are escaped via
+        ``_like_pattern`` and ``ESCAPE '\\'``.
+        """
+        from memory_agent.contracts.audit import MemoryListItemDTO
+
+        snapshot_id, _ = _read_head_snapshot(self.vault)
+        page_size = max(1, min(200, int(page_size)))
+        # Cursor strategy: ORDER BY recorded_at DESC + memory_id, so
+        # the last-(recorded_at, memory_id) pair drives pagination.
+        decoded = decode_cursor(cursor, scope="memories")
+        if decoded is not None and decoded["snapshot_id"] != snapshot_id:
+            decoded = None
+        last_recorded = ""
+        last_mid = ""
+        if decoded:
+            last_recorded = str(decoded["params"].get("last_recorded_at") or "")
+            last_mid = str(decoded["params"].get("last_memory_id") or "")
+
+        params: list[Any] = []
+        where = []
+        if not include_archived:
+            where.append("status = 'active'")
+        else:
+            where.append("status IN ('active', 'archived')")
+        if q:
+            where.append("statement LIKE ? ESCAPE '\\'")
+            params.append(_like_pattern(q))
+        if last_recorded:
+            where.append("(recorded_at < ? OR (recorded_at = ? AND memory_id > ?))")
+            params.extend([last_recorded, last_recorded, last_mid])
+        sql = "SELECT * FROM memory_projection"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY recorded_at DESC, memory_id LIMIT ?"
+        params.append(page_size + 1)
+        rows = [_row_to_dict(r) for r in conn.execute(sql, params).fetchall()]
+        has_more = len(rows) > page_size
+        rows = rows[:page_size]
+        items: list[dict[str, Any]] = []
+        for r in rows:
+            scope = self._safe_json(r.get("scope_json") or "{}", default={})
+            scope_level = scope.get("level") if isinstance(scope, dict) else None
+            items.append(MemoryListItemDTO(
+                memory_id=str(r["memory_id"]),
+                revision=int(r["revision"]),
+                status=str(r["status"]),
+                commit_id=r.get("commit_id"),
+                recorded_at=r.get("recorded_at"),
+                statement=str(r.get("statement") or ""),
+                scope_level=scope_level if isinstance(scope_level, str) else None,
+            ).model_dump(mode="json"))
+        next_cursor = None
+        if has_more and rows:
+            next_cursor = encode_cursor(
+                scope="memories",
+                snapshot_id=snapshot_id,
+                params={
+                    "last_recorded_at": str(rows[-1]["recorded_at"]),
+                    "last_memory_id": str(rows[-1]["memory_id"]),
+                    "include_archived": include_archived,
+                    "q": q,
+                },
+            )
+        return PagedResponse(
+            header=_build_header(conn, self.vault),
+            items=items,
+            pagination=PaginationCursor(
+                cursor=cursor,
+                next_cursor=next_cursor,
+                page_size=page_size,
+            ),
+        )
+
+    # -----------------------------------------------------------------
     # audit events
     # -----------------------------------------------------------------
     def list_audit_events(
@@ -1470,6 +1562,14 @@ def list_summaries_for_route(
             cursor=args.get("cursor"),
             page_size=int(args.get("page_size") or 25),
             include_decided=bool(args.get("include_decided") or False),
+        )
+    if method == "memories":
+        return svc.list_memories(
+            conn=conn,
+            cursor=args.get("cursor"),
+            page_size=int(args.get("page_size") or 25),
+            include_archived=bool(args.get("include_archived") or False),
+            q=args.get("q"),
         )
     if method == "audit":
         return svc.list_audit_events(

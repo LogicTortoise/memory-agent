@@ -12,6 +12,7 @@ import type {
   BatchEvidenceDTO,
   ConflictDTO,
   MemoryHistoryDTO,
+  MemoryListItemDTO,
   OverviewDTO,
   PagedResponse,
   QueryTraceDTO,
@@ -150,6 +151,26 @@ export function useConflicts(args: {
     [client, args.cursor ?? null, args.page_size ?? 25, !!args.include_decided],
   );
   return usePolling<PagedResponse<ConflictDTO>>(fetcher);
+}
+
+export function useMemories(args: {
+  cursor?: string | null;
+  page_size?: number;
+  include_archived?: boolean;
+  q?: string | null;
+}) {
+  const client = useClient();
+  const fetcher = useMemo(
+    () => () => client.listMemories(args),
+    [
+      client,
+      args.cursor ?? null,
+      args.page_size ?? 25,
+      !!args.include_archived,
+      args.q ?? null,
+    ],
+  );
+  return usePolling<PagedResponse<MemoryListItemDTO>>(fetcher);
 }
 
 export function useAuditEvents(args: {
