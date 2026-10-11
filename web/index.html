@@ -13,6 +13,17 @@
         origin: window.location.origin,
         sessionToken: null,
       };
+      // Read the persisted sidebar state BEFORE React mounts so the
+      // first frame already matches the user's last choice. Without
+      // this the page would briefly flash the expanded labels even for
+      // users who collapsed the sidebar.
+      try {
+        var _stored = window.localStorage.getItem("ma-sidebar");
+        document.documentElement.dataset.sidebar =
+          _stored === "expanded" ? "expanded" : "collapsed";
+      } catch (_e) {
+        document.documentElement.dataset.sidebar = "collapsed";
+      }
     </script>
   </head>
   <body>
