@@ -223,6 +223,105 @@ def test_create_app_refuses_non_loopback_bind(tmp_path: Path) -> None:
         create_app(vault_root=tmp_path, bind_host="0.0.0.0", port=8420)
 
 
+def test_healthz_default_is_a_cheap_liveness_ping(http_client) -> None:
+    """``GET /healthz`` (no ``verbose``) returns the 5 trivial
+    liveness fields and nothing else — cheap enough for any CI /
+    k8s probe to hammer."""
+    client, _ = http_client
+    response = client.get("/healthz")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body == {
+        "ok": True,
+        "service": "memory-agent-ui",
+        "loopback_only": True,
+        "write_methods_enabled": True,
+        "session_token_configured": True,
+    }
+
+
+def test_healthz_verbose_returns_operator_facing_metrics(http_client) -> None:
+    """``GET /healthz?verbose=true`` returns the base fields plus a
+    ``verbose`` block with operator-facing metrics: privacy HEAD
+    version, worker lease state, last scan / commit timestamps,
+    conflict + memory counts, projection_state and the queued-jobs
+    counter. The verbose path must never 500 because of a downstream
+    read failure — degraded reasons go in the
+    ``degraded_reasons`` list."""
+    client, _ = http_client
+    response = client.get("/healthz?verbose=true")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    # Base fields still present.
+    assert body["ok"] is True
+    assert body["service"] == "memory-agent-ui"
+    # Verbose block.
+    verbose = body["verbose"]
+    assert isinstance(verbose, dict)
+    assert verbose["schema_version"] == 1
+    assert verbose["projection_state"] in {"aligned", "db_lag", "db_ahead", "empty"}
+    assert verbose["worker_lease_active"] is False
+    assert verbose["queued_jobs"] == 0
+    assert verbose["running_jobs"] == 0
+    assert verbose["failed_jobs"] == 0
+    # The seeded vault produced >=1 active memory and >=0 conflicts;
+    # the overview service backs the counts.
+    assert verbose["memories_active"] >= 1
+    assert verbose["conflicts_open"] >= 0
+    # Privacy HEAD — the seeded vault fixture does not call
+    # ``memory init`` (it goes straight to scan + plan + process via
+    # ``_seed_one_session``), so there is no privacy HEAD on disk and
+    # ``read_live_privacy_ledger`` raises BackupError. That is the
+    # expected behaviour for a non-initialised vault; the verbose path
+    # reports it as a degraded reason rather than 5xx-ing the endpoint.
+    assert "privacy_ledger:BackupError" in verbose["degraded_reasons"]
+    assert verbose["privacy_head_version"] is None
+    assert verbose["privacy_head_empty"] is None
+    # Degraded reasons must be a list of strings; never a 500.
+    assert isinstance(verbose["degraded_reasons"], list)
+    for r in verbose["degraded_reasons"]:
+        assert isinstance(r, str)
+
+
+def test_healthz_verbose_degrades_safely_on_uninitialised_vault(
+    tmp_path: Path,
+) -> None:
+    """A vault without ``state/state.sqlite`` must still answer
+    200 with a populated ``degraded_reasons`` list — not 5xx."""
+    vault = VaultLayout(tmp_path)
+    app = create_app(
+        vault_root=tmp_path,
+        config={
+            "session_token": "tok",
+            "allowed_origins": ["http://127.0.0.1:8420"],
+        },
+        port=8420,
+    )
+    with TestClient(app.app) as client:
+        response = client.get("/healthz?verbose=true")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    verbose = body["verbose"]
+    # state_db missing → degraded_reasons must mention it.
+    assert "vault_not_initialised" in verbose["degraded_reasons"]
+    # Counts default to 0 when the audit overview can't be read.
+    assert verbose["memories_active"] == 0
+    assert verbose["conflicts_open"] == 0
+
+
+def test_healthz_default_remains_unchanged_when_verbose_branch_fails(
+    http_client,
+) -> None:
+    """Sanity check: the default path does not consult any downstream
+    state, so it returns exactly the 5 trivial fields regardless of
+    the vault's privacy HEAD or job state."""
+    client, _ = http_client
+    response = client.get("/healthz")
+    assert response.status_code == 200
+    assert "verbose" not in response.json()
+
+
 def test_overview_returns_dto_and_carries_projection_state(
     http_client,
 ) -> None:

@@ -537,6 +537,22 @@ class JobRepo:
         ).fetchone()
         return bool(row and int(row["cancel_requested"] or 0) == 1)
 
+    def count_by_state(self, state: str) -> int:
+        """Return the number of jobs currently in ``state``.
+
+        Cheap integer count over the ``jobs`` table — used by the
+        ``/healthz?verbose=true`` endpoint to surface a queued-jobs
+        count without pulling every row. Treats ``None`` / empty state
+        as ``0``.
+        """
+        if not state:
+            return 0
+        row = self.conn.execute(
+            "SELECT COUNT(*) AS c FROM jobs WHERE state = ?",
+            (state,),
+        ).fetchone()
+        return int(row["c"] or 0) if row else 0
+
     def next_queued(self) -> dict[str, Any] | None:
         """Return the oldest queued async job or None.
 
