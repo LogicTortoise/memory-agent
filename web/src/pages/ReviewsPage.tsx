@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import {
   Banner,
   EmptyState,
   ErrorState,
   PageTitle,
-  Section,
   StatusPill,
   formatTimestamp,
 } from "../components/primitives";
@@ -44,14 +43,6 @@ export function ReviewsPage() {
   const [period, setPeriod] = useState<"weekly" | "monthly" | "">("");
   const reviews = useReviews({ page_size: 50, period: period || null });
   const detail = useDetail();
-  const [selected, setSelected] = useState<{ period: "weekly" | "monthly"; date: string } | null>(null);
-
-  useEffect(() => {
-    if (!selected && reviews.data && reviews.data.items.length > 0) {
-      const first = reviews.data.items[0];
-      setSelected({ period: first.period, date: first.date });
-    }
-  }, [reviews.data, selected]);
 
   return (
     <div>
@@ -65,7 +56,6 @@ export function ReviewsPage() {
               value={period}
               onChange={(e) => {
                 setPeriod(e.target.value as "" | "weekly" | "monthly");
-                setSelected(null);
               }}
               data-testid="reviews-period-filter"
             >
@@ -95,7 +85,6 @@ export function ReviewsPage() {
               key={`${r.period}_${r.date}`}
               review={r}
               onOpen={() => {
-                setSelected({ period: r.period, date: r.date });
                 detail.open({
                   title: `${r.period === "weekly" ? "周" : "月"} · ${r.date}`,
                   content: (
@@ -110,15 +99,6 @@ export function ReviewsPage() {
             />
           ))}
         </CardCarousel>
-      )}
-      {selected && (
-        <Section title="最近选中">
-          <ReviewDetailPanel
-            period={selected.period}
-            date={selected.date}
-            summary={null}
-          />
-        </Section>
       )}
     </div>
   );
