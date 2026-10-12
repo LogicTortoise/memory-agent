@@ -25,6 +25,7 @@ const navItems: Array<{ to: string; label: string; monogram: string }> = [
   { to: "/batches", label: "处理批次", monogram: "批" },
   { to: "/memories", label: "记忆与决定", monogram: "记" },
   { to: "/queries", label: "查询审计", monogram: "查" },
+  { to: "/reviews", label: "分类复查", monogram: "整" },
   { to: "/audit", label: "审计与作业", monogram: "审" },
 ];
 

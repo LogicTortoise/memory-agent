@@ -6,6 +6,7 @@ import { SourcesPage } from "./pages/SourcesPage";
 import { BatchesPage } from "./pages/BatchesPage";
 import { MemoriesPage } from "./pages/MemoriesPage";
 import { QueriesPage } from "./pages/QueriesPage";
+import { ReviewsPage } from "./pages/ReviewsPage";
 import { AuditPage } from "./pages/AuditPage";
 import { ClientProvider, useClient } from "./hooks/useClient";
 import { MemoryAgentClient } from "./api/client";
@@ -41,6 +42,7 @@ export function App(props: AppProps) {
             <Route path="batches" element={<BatchesPage />} />
             <Route path="memories" element={<MemoriesPage />} />
             <Route path="queries" element={<QueriesPage />} />
+            <Route path="reviews" element={<ReviewsPage />} />
             <Route path="audit" element={<AuditPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

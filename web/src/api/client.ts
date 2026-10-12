@@ -30,6 +30,7 @@ import type {
   ListJobsArgs,
   ListMemoriesArgs,
   ListQueryTracesArgs,
+  ListReviewsArgs,
   ListSessionTurnsArgs,
   ListSourcesArgs,
   MemoryHistoryDTO,
@@ -38,6 +39,8 @@ import type {
   PagedResponse,
   QueryTraceDTO,
   QueryTraceDetailDTO,
+  ReviewDetailDTO,
+  ReviewListItemDTO,
   SessionTurnDTO,
   SourceDTO,
   SourceDetailDTO,
@@ -191,6 +194,20 @@ export class MemoryAgentClient {
     if (args.state) qs.set("state", args.state);
     if (args.q) qs.set("q", args.q);
     return this.getJson<PagedResponse<JobListItemDTO>>(`/api/v1/jobs?${qs}`);
+  }
+
+  listReviews(args: ListReviewsArgs = {}): Promise<PagedResponse<ReviewListItemDTO>> {
+    const qs = new URLSearchParams();
+    if (args.cursor) qs.set("cursor", args.cursor);
+    if (args.page_size) qs.set("page_size", String(args.page_size));
+    if (args.period) qs.set("period", args.period);
+    return this.getJson<PagedResponse<ReviewListItemDTO>>(`/api/v1/reviews?${qs}`);
+  }
+
+  reviewDetail(period: "weekly" | "monthly", date: string): Promise<ReviewDetailDTO> {
+    return this.getJson<ReviewDetailDTO>(
+      `/api/v1/reviews/${encodeURIComponent(period)}/${encodeURIComponent(date)}`,
+    );
   }
 
   listAuditEvents(args: ListAuditArgs = {}): Promise<PagedResponse<AuditEventDTO>> {

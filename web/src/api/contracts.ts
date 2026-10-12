@@ -190,6 +190,42 @@ export interface JobListItemDTO {
   last_heartbeat: string | null;
 }
 
+export interface ReviewListItemDTO {
+  period: "weekly" | "monthly";
+  date: string;
+  worker_id: string;
+  audit_id: string;
+  created_at: string;
+  proposal_count: number;
+  metric_summary: Record<string, number>;
+}
+
+export type ListReviewsArgs = {
+  cursor?: string | null;
+  page_size?: number;
+  period?: "weekly" | "monthly" | null;
+};
+
+export interface ReviewProposalDTO {
+  kind: string;
+  reason: string;
+  // Proposal-kind-specific fields preserved verbatim from the
+  // on-disk artifact (sample_memory_ids, memory_ids, scope, etc.).
+  payload: Record<string, unknown>;
+}
+
+export interface ReviewDetailDTO {
+  header: EnvelopeHeader;
+  period: "weekly" | "monthly";
+  date: string;
+  worker_id: string;
+  audit_id: string;
+  created_at: string;
+  proposal_count: number;
+  metrics: Record<string, unknown>;
+  proposals: ReviewProposalDTO[];
+}
+
 export type ListJobsArgs = {
   cursor?: string | null;
   page_size?: number;

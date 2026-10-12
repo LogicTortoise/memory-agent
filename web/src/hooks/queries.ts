@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 
-import { MemoryAgentClient } from "../api/client";
+import { MemoryAgentClient, HttpError } from "../api/client";
 import type {
   AuditEventDTO,
   BatchDTO,
@@ -18,6 +18,8 @@ import type {
   PagedResponse,
   QueryTraceDTO,
   QueryTraceDetailDTO,
+  ReviewDetailDTO,
+  ReviewListItemDTO,
   SessionTurnDTO,
   SourceDTO,
   SourceDetailDTO,
@@ -192,6 +194,37 @@ export function useJobs(args: {
     ],
   );
   return usePolling<PagedResponse<JobListItemDTO>>(fetcher);
+}
+
+export function useReviews(args: {
+  cursor?: string | null;
+  page_size?: number;
+  period?: "weekly" | "monthly" | null;
+}) {
+  const client = useClient();
+  const fetcher = useMemo(
+    () => () => client.listReviews(args),
+    [client, args.cursor ?? null, args.page_size ?? 25, args.period ?? null],
+  );
+  return usePolling<PagedResponse<ReviewListItemDTO>>(fetcher);
+}
+
+export function useReviewDetail(period: "weekly" | "monthly" | null, date: string | null) {
+  const client = useClient();
+  const fetcher = useMemo(
+    () => async () => {
+      if (!period || !date) return null;
+      try {
+        return await client.reviewDetail(period, date);
+      } catch (err) {
+        // 404 → null (no artifact for this pair yet)
+        if (err instanceof HttpError && err.status === 404) return null;
+        throw err;
+      }
+    },
+    [client, period, date],
+  );
+  return usePolling<ReviewDetailDTO | null>(fetcher, { enabled: !!period && !!date });
 }
 
 export function useAuditEvents(args: {
