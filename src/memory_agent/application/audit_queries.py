@@ -58,6 +58,9 @@ from memory_agent.contracts.audit import (
     ProjectionState,
     QueryTraceDTO,
     QueryTraceDetailDTO,
+    ReviewDetailDTO,
+    ReviewListItemDTO,
+    ReviewProposalDTO,
     SessionTurnDTO,
     SourceDTO,
     SourceDetailDTO,
@@ -1184,6 +1187,183 @@ class AuditQueries:
         )
 
     # -----------------------------------------------------------------
+    # reviews  (weekly / monthly classification review artifacts)
+    # -----------------------------------------------------------------
+    def list_reviews(
+        self,
+        *,
+        conn,
+        cursor: str | None,
+        page_size: int = 25,
+        period: str | None = None,
+    ) -> PagedResponse:
+        """List weekly / monthly review artifacts on disk.
+
+        Closes the operator-visibility gap from R08 (docs/01) and
+        docs/05 §131 / §141: the worker writes conservative review
+        proposals to ``<vault>/artifacts/reviews/{weekly,monthly}_<date>.json``
+        and a single ``review.produced`` audit row. Until now the
+        only way to read the proposal was ``cat`` on disk or
+        ``memory review`` to trigger a new pass. The list view
+        surfaces existing artifacts with a coarse metric summary
+        (counts per proposal kind); the full proposal list is on
+        the detail endpoint.
+
+        Filesystem scan is cheap (one ``scandir`` per call) and
+        capped by ``page_size``. Cursor pagination is scoped +
+        snapshot-bound like every other list endpoint.
+        """
+        snapshot_id, _ = _read_head_snapshot(self.vault)
+        decoded = decode_cursor(cursor, scope="reviews")
+        if decoded is not None and decoded["snapshot_id"] != snapshot_id:
+            decoded = None
+        page_size = max(1, min(200, int(page_size)))
+        last_key: tuple[str, str] | None = None
+        if decoded:
+            lk = decoded["params"].get("last_key")
+            if isinstance(lk, list) and len(lk) == 2:
+                last_key = (str(lk[0]), str(lk[1]))
+
+        # Discover on-disk artifacts. The review dir is optional
+        # (an un-initialised vault has none); a missing dir is
+        # not an error — it just yields an empty page.
+        root = self.vault.artifacts_dir / "reviews"
+        artifacts: list[ReviewListItemDTO] = []
+        if root.is_dir():
+            # period filter is symmetric with the worker naming:
+            # the on-disk files are named ``weekly_*.json`` /
+            # ``monthly_*.json``.
+            allowed_periods: tuple[str, ...] | None = None
+            if period in ("weekly", "monthly"):
+                allowed_periods = (period,)
+            for path in root.glob("*.json"):
+                stem = path.stem  # e.g. "weekly_2026-10-09"
+                if "_" not in stem:
+                    continue
+                p, date_str = stem.split("_", 1)
+                if p not in ("weekly", "monthly"):
+                    continue
+                if allowed_periods is not None and p not in allowed_periods:
+                    continue
+                # Cursor key: (period, date) sorted by
+                # (date DESC, period DESC) so the newest reviews
+                # come first — matches the audit feed ordering.
+                try:
+                    payload = json.loads(path.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    continue
+                if not isinstance(payload, dict):
+                    continue
+                kind_counts: dict[str, int] = {}
+                for prop in payload.get("proposals") or []:
+                    if not isinstance(prop, dict):
+                        continue
+                    k = str(prop.get("kind") or "unknown")
+                    kind_counts[k] = kind_counts.get(k, 0) + 1
+                artifacts.append(ReviewListItemDTO(
+                    period=p,  # type: ignore[arg-type]
+                    date=str(date_str),
+                    worker_id=str(payload.get("worker_id") or ""),
+                    audit_id=str(payload.get("audit_id") or ""),
+                    created_at=str(payload.get("created_at") or ""),
+                    proposal_count=len(payload.get("proposals") or []),
+                    metric_summary=kind_counts,
+                ))
+        # Newest first: date DESC, period DESC (weekly before monthly
+        # on the same date matches the operator's mental model —
+        # weekly is the lighter, more frequent pass).
+        artifacts.sort(key=lambda x: (x.date, x.period), reverse=True)
+
+        # Cursor pagination. (date, period) pair is the natural
+        # sort key, but the cursor payload needs to be JSON-safe
+        # so we encode it as a list of two strings.
+        start = 0
+        if last_key is not None:
+            last_date, last_period = last_key
+            for idx, item in enumerate(artifacts):
+                if (item.date, item.period) == (last_date, last_period):
+                    start = idx + 1
+                    break
+        page = artifacts[start:start + page_size + 1]
+        has_more = len(page) > page_size
+        page = page[:page_size]
+        next_cursor = None
+        if has_more and page:
+            last = page[-1]
+            next_cursor = encode_cursor(
+                scope="reviews",
+                snapshot_id=snapshot_id,
+                params={
+                    "last_key": [last.date, last.period],
+                    "period": period,
+                },
+            )
+        return PagedResponse(
+            header=_build_header(conn, self.vault),
+            items=[a.model_dump(mode="json") for a in page],
+            pagination=PaginationCursor(
+                cursor=cursor,
+                next_cursor=next_cursor,
+                page_size=page_size,
+            ),
+        )
+
+    def get_review(
+        self,
+        *,
+        conn,
+        period: str,
+        date: str,
+    ) -> ReviewDetailDTO | None:
+        """Return the full review artifact for one ``(period, date)`` pair.
+
+        Returns ``None`` when no artifact exists for the requested
+        pair — the HTTP layer maps that to a 404. The proposal
+        payload is passed through verbatim from the on-disk JSON
+        so the UI can render any new proposal ``kind`` without a
+        contract bump (the discriminator is ``payload.kind``).
+        """
+        if period not in ("weekly", "monthly"):
+            return None
+        # Defensive date guard: refuse anything that does not look
+        # like ``YYYY-MM-DD`` so the path cannot escape the
+        # artifacts dir via the route parameter.
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+            return None
+        path = self.vault.artifacts_dir / "reviews" / f"{period}_{date}.json"
+        if not path.is_file():
+            return None
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        if not isinstance(payload, dict):
+            return None
+        proposals: list[ReviewProposalDTO] = []
+        for prop in payload.get("proposals") or []:
+            if not isinstance(prop, dict):
+                continue
+            proposals.append(ReviewProposalDTO(
+                kind=str(prop.get("kind") or "unknown"),
+                reason=str(prop.get("reason") or ""),
+                payload={
+                    str(k): v for k, v in prop.items()
+                    if k not in ("kind", "reason")
+                },
+            ))
+        return ReviewDetailDTO(
+            header=_build_header(conn, self.vault),
+            period=period,  # type: ignore[arg-type]
+            date=str(payload.get("date") or date),
+            worker_id=str(payload.get("worker_id") or ""),
+            audit_id=str(payload.get("audit_id") or ""),
+            created_at=str(payload.get("created_at") or ""),
+            proposal_count=len(proposals),
+            metrics=dict(payload.get("metrics") or {}),
+            proposals=proposals,
+        )
+
+    # -----------------------------------------------------------------
     # conflicts
     # -----------------------------------------------------------------
     def list_conflicts(
@@ -1678,6 +1858,13 @@ def list_summaries_for_route(
             page_size=int(args.get("page_size") or 25),
             state=args.get("state"),
             q=args.get("q"),
+        )
+    if method == "reviews":
+        return svc.list_reviews(
+            conn=conn,
+            cursor=args.get("cursor"),
+            page_size=int(args.get("page_size") or 25),
+            period=args.get("period"),
         )
     if method == "audit":
         return svc.list_audit_events(

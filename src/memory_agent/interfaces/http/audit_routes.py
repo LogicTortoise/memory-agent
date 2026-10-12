@@ -14,12 +14,16 @@ Routes (paths match docs/10 §"本地审计 HTTP 接口"):
     /api/v1/batches
     /api/v1/batches/{id}
     /api/v1/batches/{id}/evidence
+    /api/v1/memories
     /api/v1/memories/{id}/history
     /api/v1/conflicts
+    /api/v1/jobs
     /api/v1/audit
     /api/v1/audit/{id}
     /api/v1/queries
     /api/v1/queries/{trace_id}
+    /api/v1/reviews
+    /api/v1/reviews/{period}/{date}
 
 The static UI asset path ``/`` is also served when a packaged
 ``ui-dist`` directory is present; otherwise a tiny placeholder page
@@ -347,6 +351,87 @@ def list_memories(
         },
     )
     return body.model_dump(mode="json")
+
+
+# ---------------------------------------------------------------------------
+# /api/v1/reviews  (weekly / monthly classification review artifacts)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/reviews")
+def list_reviews(
+    request: Request,
+    cursor: str | None = Query(default=None),
+    page_size: int = Query(default=25, ge=1, le=200),
+    period: str | None = Query(default=None),
+    svc: AuditQueries = Depends(_audit_service),
+    conn=Depends(_open_conn),
+) -> dict[str, Any]:
+    """List review artifacts (weekly / monthly) written by the worker.
+
+    Closes the operator-visibility gap from R08 (docs/01) and
+    docs/05 §131 / §141: the worker writes conservative
+    classification-review proposals to
+    ``<vault>/artifacts/reviews/{weekly,monthly}_<date>.json`` and
+    a single ``review.produced`` audit row. Until now the only way
+    to read the proposal was ``cat`` on disk; this list view
+    surfaces the artifact with a coarse ``metric_summary``
+    (proposal-kind counts). The full proposal list is on the
+    detail endpoint ``GET /api/v1/reviews/{period}/{date}``.
+
+    ``period`` is optional; pass ``weekly`` or ``monthly`` to
+    narrow. Pagination is cursor-bound + snapshot-scoped like
+    every other list endpoint.
+    """
+    if period is not None and period not in ("weekly", "monthly"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"period must be 'weekly' or 'monthly', got {period!r}",
+        )
+    cursor = _validate_cursor(cursor, "reviews")
+    body = list_summaries_for_route(
+        svc, conn=conn, method="reviews",
+        args={
+            "cursor": cursor, "page_size": page_size,
+            "period": period,
+        },
+    )
+    return body.model_dump(mode="json")
+
+
+@router.get("/reviews/{period}/{date}")
+def review_detail(
+    request: Request,
+    period: str,
+    date: str,
+    svc: AuditQueries = Depends(_audit_service),
+    conn=Depends(_open_conn),
+) -> dict[str, Any]:
+    """Return the full review artifact for one ``(period, date)`` pair.
+
+    Reads ``<vault>/artifacts/reviews/{period}_{date}.json`` and
+    returns its proposals + metrics. Returns 404 when the artifact
+    is absent; 400 when ``period`` is not ``weekly`` / ``monthly``
+    or ``date`` is not ``YYYY-MM-DD``.
+    """
+    import re as _re
+    if period not in ("weekly", "monthly"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"period must be 'weekly' or 'monthly', got {period!r}",
+        )
+    if not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        raise HTTPException(
+            status_code=400,
+            detail=f"date must be YYYY-MM-DD, got {date!r}",
+        )
+    dto = svc.get_review(conn=conn, period=period, date=date)
+    if dto is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"review not found: {period}/{date}",
+        )
+    return dto.model_dump(mode="json")
 
 
 # ---------------------------------------------------------------------------

@@ -353,6 +353,69 @@ class JobListItemDTO(BaseModel):
     last_heartbeat: str | None
 
 
+class ReviewListItemDTO(BaseModel):
+    """Metadata-only summary for the /reviews list view.
+
+    Closes the operator-visibility gap from R08 (docs/01) and
+    docs/05 §131 / §141: the worker writes conservative weekly
+    + monthly review proposals to
+    ``<vault>/artifacts/reviews/{weekly,monthly}_<date>.json``,
+    but until now the only way to read them was ``cat`` on disk.
+    This DTO is the shape ``GET /api/v1/reviews`` returns — the
+    proposals are **excluded** from the list view (they can be
+    large when the vault is bloated) and a separate
+    ``GET /api/v1/reviews/{period}/{date}`` returns the full
+    artifact.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    period: Literal["weekly", "monthly"]
+    date: str
+    worker_id: str
+    audit_id: str
+    created_at: str
+    proposal_count: int
+    # Coarse metric summary: counts of each proposal kind (so the
+    # operator can see at a glance whether this week had any
+    # split_candidate / merge_candidate / scope_overlap hits).
+    metric_summary: dict[str, int] = Field(default_factory=dict)
+
+
+class ReviewProposalDTO(BaseModel):
+    """One review proposal (split / merge / scope_overlap).
+
+    The proposal schema is **deliberately permissive** here —
+    ``extra="forbid"`` is too tight because new proposal kinds
+    may be added without a contract bump (the artifact is a
+    JSON file; the kind field is the discriminator). The list
+    of proposal kinds is documented in
+    ``application/worker.py::_weekly_proposals`` /
+    ``_monthly_proposals`` and pinned by the corresponding
+    tests in ``tests/integration/test_phase_c_v1.py``.
+    """
+    kind: str
+    reason: str
+    # Everything else is passed through as the raw proposal
+    # dict. Keys depend on ``kind`` (sample_memory_ids for
+    # split_candidate, memory_ids for merge_candidate, etc.).
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReviewDetailDTO(BaseModel):
+    """Full review artifact (proposals + metrics)."""
+    model_config = ConfigDict(extra="forbid")
+
+    header: "EnvelopeHeader"
+    period: Literal["weekly", "monthly"]
+    date: str
+    worker_id: str
+    audit_id: str
+    created_at: str
+    proposal_count: int
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    proposals: list[ReviewProposalDTO] = Field(default_factory=list)
+
+
 class MemoryHistoryDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

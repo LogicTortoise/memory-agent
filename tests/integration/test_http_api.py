@@ -892,3 +892,210 @@ def test_post_commands_async_then_get_jobs_polls_queue(
     assert r2.status_code == 200, r2.text
     assert r2.json()["job_id"] == job_id
     assert r2.json()["job_state"] in {"queued", "running", "succeeded", "failed"}
+
+# ---------------------------------------------------------------------------
+# /api/v1/reviews  (weekly / monthly classification review artifacts)
+# ---------------------------------------------------------------------------
+
+
+def _write_review_artifact(
+    *, app_obj, period: str, date: str,
+    proposals: list[dict[str, object]] | None = None,
+    metrics: dict[str, object] | None = None,
+) -> None:
+    """Drop a fake ``<vault>/artifacts/reviews/{period}_{date}.json``.
+
+    The on-disk shape mirrors what
+    ``application/worker.py::_write_review_proposal`` produces.
+    """
+    from memory_agent.infrastructure.files import VaultLayout
+
+    vault = VaultLayout(app_obj.vault.root)
+    root = vault.artifacts_dir / "reviews"
+    root.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "period": period,
+        "date": date,
+        "worker_id": "review_test",
+        "audit_id": f"aud_{period}_{date}",
+        "created_at": f"{date}T03:30:00+00:00",
+        "metrics": metrics or {"active_memories": 0},
+        "proposals": proposals or [],
+    }
+    (root / f"{period}_{date}.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def test_reviews_list_returns_seeded_artifacts(http_client) -> None:
+    """``GET /api/v1/reviews`` surfaces weekly + monthly artifacts
+    on disk with a coarse metric summary so the operator no longer
+    has to ``cat`` the on-disk JSON."""
+    client, app_obj = http_client
+    _write_review_artifact(
+        app_obj=app_obj, period="weekly", date="2026-10-05",
+        proposals=[
+            {
+                "kind": "split_candidate",
+                "project_id": "proj_a",
+                "memory_kind": "requirement",
+                "memory_count": 32,
+                "reason": "project proj_a carries 32 active 'requirement' memories",
+                "sample_memory_ids": ["mem_1", "mem_2", "mem_3"],
+            },
+        ],
+    )
+    _write_review_artifact(
+        app_obj=app_obj, period="monthly", date="2026-10-01",
+        proposals=[
+            {
+                "kind": "scope_overlap",
+                "primary_domain": "dom_ai_video",
+                "global_count": 1,
+                "project_count": 2,
+                "reason": "primary domain held by both global and project",
+            },
+            {
+                "kind": "merge_candidate",
+                "scope": {"level": "project", "project_ids": ["proj_a"]},
+                "memory_count": 2,
+                "shared_tokens": "use python prototype",
+                "memory_ids": ["mem_1", "mem_2"],
+                "reason": "two memories share the same token set",
+            },
+        ],
+    )
+
+    response = client.get("/api/v1/reviews?page_size=50")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    periods = {(it["period"], it["date"]) for it in body["items"]}
+    assert {("weekly", "2026-10-05"), ("monthly", "2026-10-01")} <= periods
+    # Sort: newest first by (date DESC, period DESC)
+    dates = [it["date"] for it in body["items"]]
+    assert dates == sorted(dates, reverse=True)
+    # metric_summary pins the kind counts so the operator can see
+    # at a glance which proposal kinds fired this pass.
+    weekly = next(
+        it for it in body["items"]
+        if it["period"] == "weekly" and it["date"] == "2026-10-05"
+    )
+    assert weekly["metric_summary"] == {"split_candidate": 1}
+    monthly = next(
+        it for it in body["items"]
+        if it["period"] == "monthly" and it["date"] == "2026-10-01"
+    )
+    assert monthly["metric_summary"]["scope_overlap"] == 1
+    assert monthly["metric_summary"]["merge_candidate"] == 1
+    assert monthly["proposal_count"] == 2
+
+
+def test_reviews_list_period_filter_narrows_results(http_client) -> None:
+    client, app_obj = http_client
+    _write_review_artifact(
+        app_obj=app_obj, period="weekly", date="2026-10-05",
+    )
+    _write_review_artifact(
+        app_obj=app_obj, period="monthly", date="2026-10-01",
+    )
+
+    only_weekly = client.get("/api/v1/reviews?period=weekly&page_size=50").json()
+    periods = {it["period"] for it in only_weekly["items"]}
+    assert periods == {"weekly"}
+    only_monthly = client.get("/api/v1/reviews?period=monthly&page_size=50").json()
+    periods = {it["period"] for it in only_monthly["items"]}
+    assert periods == {"monthly"}
+
+
+def test_reviews_list_rejects_invalid_period(http_client) -> None:
+    client, _ = http_client
+    r = client.get("/api/v1/reviews?period=biweekly")
+    assert r.status_code == 400
+    assert "weekly" in r.json()["detail"]
+
+
+def test_reviews_list_empty_when_no_artifacts(http_client) -> None:
+    """An un-initialised vault has no review dir; the list must
+    return 200 with an empty page rather than 5xx."""
+    client, _ = http_client
+    body = client.get("/api/v1/reviews?page_size=25").json()
+    assert body["items"] == []
+    assert body["pagination"]["next_cursor"] is None
+
+
+def test_reviews_detail_returns_full_proposals(http_client) -> None:
+    client, app_obj = http_client
+    _write_review_artifact(
+        app_obj=app_obj, period="weekly", date="2026-10-05",
+        proposals=[
+            {
+                "kind": "split_candidate",
+                "project_id": "proj_a",
+                "memory_kind": "requirement",
+                "memory_count": 32,
+                "reason": "project proj_a carries 32 active 'requirement' memories",
+                "sample_memory_ids": ["mem_1", "mem_2", "mem_3"],
+            },
+        ],
+        metrics={"active_memories": 50, "projects": {"proj_a": 32}},
+    )
+
+    r = client.get("/api/v1/reviews/weekly/2026-10-05")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["period"] == "weekly"
+    assert body["date"] == "2026-10-05"
+    assert body["worker_id"] == "review_test"
+    assert body["proposal_count"] == 1
+    assert body["metrics"] == {"active_memories": 50, "projects": {"proj_a": 32}}
+    assert len(body["proposals"]) == 1
+    prop = body["proposals"][0]
+    assert prop["kind"] == "split_candidate"
+    assert "32 active" in prop["reason"]
+    # The proposal payload is the original ``prop`` dict with
+    # kind / reason stripped (those are surfaced at the top level
+    # so the UI can pill the kind without parsing the payload).
+    assert prop["payload"]["project_id"] == "proj_a"
+    assert prop["payload"]["memory_count"] == 32
+    assert prop["payload"]["sample_memory_ids"] == ["mem_1", "mem_2", "mem_3"]
+
+
+def test_reviews_detail_unknown_pair_returns_404(http_client) -> None:
+    client, _ = http_client
+    r = client.get("/api/v1/reviews/weekly/2026-01-01")
+    assert r.status_code == 404
+
+
+def test_reviews_detail_rejects_bad_date(http_client) -> None:
+    """The path parameter must look like ``YYYY-MM-DD`` so the
+    route cannot escape the artifacts dir."""
+    client, _ = http_client
+    r = client.get("/api/v1/reviews/weekly/not-a-date")
+    assert r.status_code == 400
+
+
+def test_reviews_detail_rejects_bad_period(http_client) -> None:
+    client, _ = http_client
+    r = client.get("/api/v1/reviews/daily/2026-10-05")
+    assert r.status_code == 400
+
+
+def test_reviews_list_paginates_by_date_period(http_client) -> None:
+    client, app_obj = http_client
+    for d in ("2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"):
+        _write_review_artifact(app_obj=app_obj, period="weekly", date=d)
+    page1 = client.get("/api/v1/reviews?page_size=2").json()
+    assert len(page1["items"]) == 2
+    cursor1 = page1["pagination"]["next_cursor"]
+    assert cursor1
+    page2 = client.get(f"/api/v1/reviews?page_size=2&cursor={cursor1}").json()
+    assert len(page2["items"]) == 2
+    # Newest first: page1 = 10-05, 10-04; page2 = 10-03, 10-02.
+    assert [it["date"] for it in page1["items"]] == ["2026-10-05", "2026-10-04"]
+    assert [it["date"] for it in page2["items"]] == ["2026-10-03", "2026-10-02"]
+    cursor2 = page2["pagination"]["next_cursor"]
+    assert cursor2
+    page3 = client.get(f"/api/v1/reviews?page_size=2&cursor={cursor2}").json()
+    assert [it["date"] for it in page3["items"]] == ["2026-10-01"]
+    assert page3["pagination"]["next_cursor"] is None
